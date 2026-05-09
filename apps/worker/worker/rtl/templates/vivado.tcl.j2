@@ -1,0 +1,18 @@
+# ASICify generated Vivado synthesis script
+# Targets Xilinx Artix-7 by default. Edit `set_part` for Kria, etc.
+
+create_project -force asicify_top ./build/vivado -part xc7a100tcsg324-1
+
+add_files [glob ./*.v]
+add_files [glob ./modules/*.v]
+
+set_property top top [current_fileset]
+update_compile_order -fileset sources_1
+
+synth_design -top top -part xc7a100tcsg324-1
+opt_design
+place_design
+route_design
+report_utilization -file ./build/utilization.rpt
+report_timing_summary -file ./build/timing.rpt
+write_bitstream -force ./build/top.bit

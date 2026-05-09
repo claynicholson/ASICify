@@ -1,0 +1,12 @@
+{
+  "name": "@asicify/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "echo 'no build step for python'",
+    "lint": "uv run ruff check app",
+    "typecheck": "uv run mypy app",
+    "clean": "rm -rf .ruff_cache .mypy_cache .pytest_cache __pycache__"
+  }
+}

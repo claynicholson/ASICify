@@ -1,0 +1,7 @@
+# ASICify generated yosys synthesis script
+# Targets ECP5 by default. For sky130 ASIC flow use openlane instead.
+
+read_verilog -sv top.v modules/*.v
+hierarchy -top top
+synth_ecp5 -top top -json build/top.json
+write_json build/top.json

@@ -1,0 +1,29 @@
+# ASICify generated Makefile
+# Targets: sim | synth-yosys | synth-vivado | clean
+
+TOPLEVEL_LANG ?= verilog
+TOPLEVEL := top
+MODULE   := tb_top
+
+VERILOG_SOURCES := $(wildcard ./*.v) $(wildcard modules/*.v)
+
+.PHONY: sim synth-yosys synth-vivado clean
+
+sim:
+	@echo "Running cocotb simulation with Verilator…"
+	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	    SIM=verilator TOPLEVEL=$(TOPLEVEL) MODULE=$(MODULE) \
+	    VERILOG_SOURCES="$(VERILOG_SOURCES)"
+
+synth-yosys:
+	@echo "Synthesizing for ECP5 with yosys + nextpnr…"
+	yosys -c synthesis/yosys.tcl
+	bash synthesis/nextpnr.sh
+
+synth-vivado:
+	@echo "Synthesizing for Xilinx with Vivado…"
+	vivado -mode batch -source synthesis/vivado.tcl
+
+clean:
+	rm -rf sim_build results.xml *.vcd *.log
+	rm -rf build/

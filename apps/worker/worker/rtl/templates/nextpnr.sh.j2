@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# ASICify generated place-and-route for ECP5 (Lattice).
+set -euo pipefail
+mkdir -p build
+nextpnr-ecp5 \
+    --json build/top.json \
+    --textcfg build/top.config \
+    --25k --package CABGA381 \
+    --speed 6
+ecppack build/top.config build/top.bit
+echo "Generated build/top.bit"

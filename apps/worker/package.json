@@ -1,0 +1,12 @@
+{
+  "name": "@asicify/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run python -m worker.main",
+    "build": "echo 'no build step for python'",
+    "lint": "uv run ruff check worker",
+    "typecheck": "uv run mypy worker",
+    "clean": "rm -rf .ruff_cache .mypy_cache __pycache__"
+  }
+}

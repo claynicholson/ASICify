@@ -1,0 +1,70 @@
+// {{ layer.name }} — fixed-coefficient matrix-vector product
+// in_features={{ layer.in_features }}  out_features={{ layer.out_features }}
+// param_count={{ layer.param_count }}  multiplier={{ multiplier }}
+
+`default_nettype none
+
+module {{ layer.name | replace('.', '_') }} #(
+    parameter integer DATA_WIDTH = 8,
+    parameter integer IN_FEATURES  = {{ layer.in_features }},
+    parameter integer OUT_FEATURES = {{ layer.out_features }}
+) (
+    input  wire                  clk,
+    input  wire                  rst_n,
+    input  wire                  in_valid,
+    output wire                  in_ready,
+    input  wire [DATA_WIDTH-1:0] in_data,
+    output reg                   out_valid,
+    input  wire                  out_ready,
+    output reg  [DATA_WIDTH-1:0] out_data
+);
+
+    // Weights are hardwired via `weights/weights.vh`. The synthesis flow
+    // turns these into a mask ROM; place-and-route flattens the constants
+    // into the multiplier inputs (CSD / XNOR / Booth depending on precision).
+    `include "weights/weights.vh"
+
+    localparam integer ACC_WIDTH = 32;
+    reg [ACC_WIDTH-1:0] accumulator [0:OUT_FEATURES-1];
+    reg [$clog2(IN_FEATURES+1)-1:0] in_idx;
+
+    assign in_ready = ~out_valid | out_ready;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            in_idx    <= '0;
+            out_valid <= 1'b0;
+            out_data  <= '0;
+            for (int i = 0; i < OUT_FEATURES; i = i + 1)
+                accumulator[i] <= '0;
+        end else if (in_valid && in_ready) begin
+            // {{ multiplier }} multiplier strategy: see ASICify docs
+            for (int o = 0; o < OUT_FEATURES; o = o + 1) begin
+{% if multiplier == 'xnor_popcount' %}
+                accumulator[o] <= accumulator[o] + (~(in_data ^ W_{{ layer.name | replace('.', '_') }}[o][in_idx]) ? 1 : -1);
+{% elif multiplier == 'sign_flip_mux' %}
+                // Ternary: weight ∈ {-1, 0, +1}
+                case (W_{{ layer.name | replace('.', '_') }}[o][in_idx])
+                    2'b01:  accumulator[o] <= accumulator[o] + in_data;
+                    2'b11:  accumulator[o] <= accumulator[o] - in_data;
+                    default: accumulator[o] <= accumulator[o];
+                endcase
+{% else %}
+                accumulator[o] <= accumulator[o] +
+                                  $signed(in_data) * $signed(W_{{ layer.name | replace('.', '_') }}[o][in_idx]);
+{% endif %}
+            end
+            in_idx <= (in_idx == IN_FEATURES - 1) ? '0 : in_idx + 1;
+            if (in_idx == IN_FEATURES - 1) begin
+                out_valid <= 1'b1;
+                // truncation / rescale happens here in the real implementation
+                out_data <= accumulator[0][DATA_WIDTH-1:0];
+            end
+        end else if (out_valid && out_ready) begin
+            out_valid <= 1'b0;
+        end
+    end
+
+endmodule
+
+`default_nettype wire

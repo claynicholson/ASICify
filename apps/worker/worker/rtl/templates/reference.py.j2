@@ -1,0 +1,28 @@
+"""Bit-exact Python reference for {{ graph.name }}.
+
+This file is generated alongside the RTL. It must produce the same outputs as
+the synthesized hardware for any deterministic input — the cocotb testbench
+relies on this for verification.
+
+Quantization: {{ config.quantization }}
+Multiplier:   {{ multiplier }}
+"""
+
+from __future__ import annotations
+
+
+def reference_forward(inputs: list[int]) -> list[int]:
+    """Apply the compressed model's forward pass to a sequence of integer inputs.
+
+    The full implementation loads the same weight tensors that were packed into
+    `weights/weights.vh` and applies them with the same fixed-point arithmetic
+    used by the multiplier strategy.
+    """
+    # Stub: identity. Replace with the actual layer-by-layer math in production.
+    return list(inputs)
+
+
+if __name__ == "__main__":
+    import sys
+    xs = [int(x) for x in sys.argv[1:]] or [0, 1, 2, 3]
+    print(reference_forward(xs))

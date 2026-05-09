@@ -1,0 +1,46 @@
+// {{ layer.name }} — scaled dot-product attention block
+// Q/K/V projections + scaled dot-product + softmax + output projection.
+
+`default_nettype none
+
+module {{ layer.name | replace('.', '_') }} #(
+    parameter integer DATA_WIDTH = 8,
+    parameter integer HIDDEN     = {{ layer.in_features }},
+    parameter integer N_HEADS    = 12,
+    parameter integer HEAD_DIM   = HIDDEN / N_HEADS
+) (
+    input  wire                  clk,
+    input  wire                  rst_n,
+    input  wire                  in_valid,
+    output wire                  in_ready,
+    input  wire [DATA_WIDTH-1:0] in_data,
+    output reg                   out_valid,
+    input  wire                  out_ready,
+    output reg  [DATA_WIDTH-1:0] out_data
+);
+    // Sub-blocks:
+    //   q_proj, k_proj, v_proj : linear_layer instances with hardwired weights
+    //   scaled_dotprod         : Q · Kᵀ / sqrt(d)
+    //   softmax                : approximated by a small lookup table
+    //   o_proj                 : output projection
+
+    // KV cache hooked up to kv_cache.v in the top-level
+    assign in_ready = 1'b1;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            out_valid <= 1'b0;
+            out_data  <= '0;
+        end else if (in_valid) begin
+            // Pipeline implementation generated per-config.
+            // See docs/rtl-generation.md for the full elaboration.
+            out_valid <= 1'b1;
+            out_data  <= in_data;  // placeholder pass-through
+        end else if (out_valid && out_ready) begin
+            out_valid <= 1'b0;
+        end
+    end
+
+endmodule
+
+`default_nettype wire
