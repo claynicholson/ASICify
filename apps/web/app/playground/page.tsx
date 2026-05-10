@@ -9,6 +9,7 @@ import { ResultsPanel } from "@/components/playground/results-panel";
 import { Floorplan } from "@/components/playground/floorplan";
 import { ParetoPlot } from "@/components/playground/pareto-plot";
 import { InferenceComparison } from "@/components/playground/inference-comparison";
+import { WebGPUInference } from "@/components/playground/webgpu-inference";
 import { MODEL_CATALOG, opsPerInference } from "@/lib/catalog";
 import { quickEstimate } from "@/lib/estimator";
 
@@ -19,6 +20,26 @@ const DEFAULT_CONFIG: CompressionConfig = {
   fine_tune: false,
   fine_tune_steps: 1000,
 };
+
+function buildReportUrl(
+  modelId: string,
+  config: CompressionConfig,
+  target: TargetId,
+): string {
+  const compare = ["tsmc28", "ecp5", "sky130", "kria"]
+    .filter((t) => t !== target)
+    .join(",");
+  const params = new URLSearchParams({
+    model: modelId,
+    q: config.quantization,
+    sp: config.sparsity.type,
+    spr: String(config.sparsity.ratio),
+    dc: config.decomposition.type,
+    target,
+    compare,
+  });
+  return `/api/report?${params.toString()}`;
+}
 
 export default function PlaygroundPage() {
   const [modelId, setModelId] = useState(MODEL_CATALOG[0].id);
@@ -69,14 +90,24 @@ export default function PlaygroundPage() {
     <>
       <Nav />
       <main className="mx-auto max-w-[1440px] px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight-display">
-            Playground
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Live estimates as you tune compression. All math runs in your
-            browser. No signup, no backend.
-          </p>
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight-display">
+              Playground
+            </h1>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              Live estimates as you tune compression. All math runs in your
+              browser. No signup, no backend.
+            </p>
+          </div>
+          <a
+            href={buildReportUrl(modelId, config, target)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm h-9 px-4 inline-flex items-center justify-center rounded-[6px] border border-[var(--color-border-default)] hover:bg-[var(--color-bg-elevated)]"
+          >
+            Download PDF report
+          </a>
         </div>
 
         <div className="grid grid-cols-12 gap-6">
@@ -116,6 +147,10 @@ export default function PlaygroundPage() {
 
             <div className="mt-6">
               <InferenceComparison quantization={config.quantization} />
+            </div>
+
+            <div className="mt-6">
+              <WebGPUInference />
             </div>
           </section>
 

@@ -42,18 +42,16 @@ async def run_compression_job(job: dict[str, Any], emit: EmitFn) -> None:
     config = _cfg_from_dict(job["compression_config"])
 
     # Stage 1: parse
-    await _stage(emit, "parse", _do_parse, job["model_source"])
+    graph = await _stage(emit, "parse", parse_model, job["model_source"])
 
-    graph = parse_model(job["model_source"])
-
-    # Stage 2: quantize
-    graph = await _stage(emit, "quantization", quantize_graph, graph, config)
-
-    # Stage 3: sparsity
+    # Stage 2: sparsity (operates on float weights)
     graph = await _stage(emit, "sparsity", apply_sparsity, graph, config)
 
-    # Stage 4: decomposition
+    # Stage 3: decomposition (operates on float weights)
     graph = await _stage(emit, "decomposition", apply_decomposition, graph, config)
+
+    # Stage 4: quantize (consumes the now-pruned float weights)
+    graph = await _stage(emit, "quantization", quantize_graph, graph, config)
 
     # Stage 5: quality validation
     baseline = 9.2 if graph.task == "language_modeling" else 1.0

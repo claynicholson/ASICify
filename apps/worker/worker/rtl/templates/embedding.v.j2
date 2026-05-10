@@ -1,36 +1,59 @@
-// {{ layer.name }} — token embedding lookup
-// Mask-ROM addressed by token id, returns hidden vector.
+// {{ layer_view.name }} (Embedding, vocab={{ layer_view.vocab_size }}, dim={{ layer_view.embedding_dim }})
+//
+// Mask-ROM addressed by token id. Streams the dim-element row out.
+// The lookup table EMBED_<symbol> is hardwired in weights.vh as a
+// 2D int8 array of shape [vocab][dim].
 
 `default_nettype none
 
-module {{ layer.name | replace('.', '_') }} #(
-    parameter integer DATA_WIDTH = 8,
-    parameter integer VOCAB_SIZE = {{ layer.in_features }},
-    parameter integer HIDDEN     = {{ layer.out_features }}
-) (
-    input  wire                       clk,
-    input  wire                       rst_n,
-    input  wire                       in_valid,
-    output wire                       in_ready,
-    input  wire [$clog2(VOCAB_SIZE)-1:0] in_data,
-    output reg                        out_valid,
-    input  wire                       out_ready,
-    output reg  [DATA_WIDTH-1:0]      out_data
-);
-    `include "weights/weights.vh"
+module layer_{{ layer_view.symbol }} (
+    input  wire                                clk,
+    input  wire                                rst_n,
 
-    assign in_ready = 1'b1;
+    input  wire                                in_valid,
+    output wire                                in_ready,
+    input  wire [$clog2({{ layer_view.vocab_size }})-1:0] in_data,
+
+    output reg                                 out_valid,
+    input  wire                                out_ready,
+    output reg  signed [7:0]                   out_data
+);
+
+    localparam int VOCAB_SIZE = {{ layer_view.vocab_size }};
+    localparam int DIM        = {{ layer_view.embedding_dim }};
+
+    `include "weights.vh"
+
+    reg [$clog2(DIM+1)-1:0] out_idx;
+    reg [$clog2(VOCAB_SIZE)-1:0] token_id;
+    reg streaming;
+
+    assign in_ready = ~streaming;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
+            out_idx   <= '0;
             out_valid <= 1'b0;
             out_data  <= '0;
-        end else if (in_valid) begin
-            // ROM lookup
-            out_data  <= EMBED_{{ layer.name | replace('.', '_') }}[in_data][0]; // first hidden dim sample
-            out_valid <= 1'b1;
-        end else if (out_valid && out_ready) begin
-            out_valid <= 1'b0;
+            streaming <= 1'b0;
+            token_id  <= '0;
+        end else if (!streaming) begin
+            if (in_valid) begin
+                token_id <= in_data;
+                streaming <= 1'b1;
+                out_idx <= '0;
+            end
+        end else begin
+            if (!out_valid || out_ready) begin
+                out_data  <= EMBED_{{ layer_view.symbol }}[token_id][out_idx];
+                out_valid <= 1'b1;
+                if (out_idx == DIM - 1) begin
+                    streaming <= 1'b0;
+                    out_idx   <= '0;
+                end else begin
+                    out_idx <= out_idx + 1;
+                end
+            end
         end
     end
 

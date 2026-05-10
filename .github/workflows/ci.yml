@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-tests:
+    name: Worker tests + bit-exactness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+
+      - name: Sync worker dependencies (CPU torch)
+        working-directory: apps/worker
+        run: uv sync --extra dev
+
+      - name: Run pytest
+        working-directory: apps/worker
+        run: uv run pytest -q
+
+  rtl-lint-and-synth:
+    name: Lint + synth check on a generated package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+
+      - name: Install verilator and yosys
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator yosys
+
+      - name: Sync worker dependencies
+        working-directory: apps/worker
+        run: uv sync --extra dev
+
+      - name: Generate the demo RTL package
+        working-directory: apps/worker
+        run: uv run asicify demo --output ./build/demo
+
+      - name: Lint with verilator (fail on warnings)
+        working-directory: apps/worker/build/demo
+        run: |
+          verilator --lint-only -Wall -Wno-DECLFILENAME \
+            top.v modules/*.v softmax.v kv_cache.v
+
+      - name: Yosys synth-check
+        working-directory: apps/worker/build/demo
+        run: |
+          yosys -p "read_verilog -sv top.v modules/*.v softmax.v kv_cache.v; \
+                    hierarchy -top top; \
+                    proc; \
+                    flatten; \
+                    stat"
+
+  web-build:
+    name: Web build + Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --filter @asicify/web... --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter @asicify/web typecheck
+
+      - name: Build
+        run: pnpm --filter @asicify/web build
+
+      - name: Build Docker image
+        run: docker build -t asicify/web:ci .

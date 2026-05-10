@@ -1,32 +1,43 @@
 """Stage 3: Sparsity.
 
-  Magnitude pruning  — Wanda or SparseGPT (one-shot, no retrain)
-  Structured 2:4/4:8 — keep layout regular for hardware efficiency
-  Block-sparse 16×16 — good for hardware tile size
+Real magnitude pruning that runs before quantization. Pruned weights become
+exact zeros in the float tensor, which then quantize to zero and stay zero
+in the packed Verilog constants. Synthesis removes the dead multipliers.
+
+Binary precision can't represent zero, so binary skips sparsity.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
 
+from worker.kernels.sparsity import apply_sparsity as _apply_kernel
+from worker.kernels.sparsity import sparsity_ratio
 from worker.types import CompressionConfig, ModelGraph
 
 
 def apply_sparsity(graph: ModelGraph, config: CompressionConfig) -> ModelGraph:
-    """Generate sparsity masks per layer (R2 keys would be filled by the kernel).
-
-    For 2:4 structured sparsity, every group of 4 contiguous weights keeps the
-    2 with highest magnitude. The mask is stored separately; the RTL generator
-    uses it to omit zero-multipliers.
-    """
-    if config.sparsity.type == "none" or config.sparsity.ratio == 0:
+    """Walk linear layers, prune in place on the float tensors, then return a new graph."""
+    if config.sparsity.type == "none" or config.sparsity.ratio == 0.0:
+        return graph
+    if config.quantization == "binary":
+        # Binary {-1, +1} has no zero, sparsity is meaningless.
         return graph
 
-    masks: dict[str, str] = {}
-    for layer in graph.layers:
-        if layer.kind not in ("linear", "ffn", "attention"):
-            # Don't prune layernorms or embeddings
-            continue
-        masks[layer.name] = f"sparsity/{graph.name}/{layer.name}.mask"
+    weights = dict(graph.metadata.get("_weights", {}))
+    masks_ratios: dict[str, float] = {}
 
-    return replace(graph, sparsity_masks=masks)
+    for layer in graph.layers:
+        if layer.kind != "linear":
+            continue
+        if layer.name not in weights:
+            continue
+        pruned = _apply_kernel(weights[layer.name], config.sparsity.type, config.sparsity.ratio)
+        weights[layer.name] = pruned
+        masks_ratios[layer.name] = sparsity_ratio(pruned)
+
+    new_graph = replace(graph)
+    new_graph.metadata = dict(graph.metadata)
+    new_graph.metadata["_weights"] = weights
+    new_graph.metadata["_sparsity_ratios"] = masks_ratios
+    return new_graph

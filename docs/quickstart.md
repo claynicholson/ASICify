@@ -1,20 +1,33 @@
 # Quickstart
 
-Compile your first model to RTL in 5 minutes.
+Two ways to use ASICify today: explore the design space in the browser, or
+run the compiler from source on your machine.
 
-## Hosted
+## Playground (in browser, zero install)
 
-1. Visit [asicify.com/playground](https://asicify.com/playground)
-2. Pick a model (e.g. `gpt2-small`)
-3. Slide quantization to INT4, sparsity to 50%
-4. Pick a target (e.g. TSMC 28nm)
-5. Hit **Compile** — full RTL package downloads as a zip
+The fastest way to get a feel for what ASICify does. The hardware estimator
+runs entirely in your browser. No signup, no backend.
 
-## CLI
+1. Open the [playground](/playground)
+2. Pick a model (e.g. `GPT-2 Small`)
+3. Drag quantization to INT4 and sparsity to 50%
+4. Pick a target (e.g. `TSMC 28nm`)
+5. Watch the silicon floorplan, area, and per-volume cost update live
+
+Try ternary against TinyTapeout to see what an ultra-small implementation
+looks like, or FP16 against TSMC 7nm to see the area cost of full
+precision.
+
+## CLI (from source)
+
+The CLI lives in `apps/worker`. There is no PyPI package yet, so you run
+it directly from a clone.
 
 ```bash
-pip install asicify
-asicify compile gpt2 \
+git clone https://github.com/claynicholson/asicify
+cd asicify/apps/worker
+uv sync
+uv run asicify compile gpt2 \
     --quantization int4 \
     --sparsity 2:4 \
     --target tsmc28,ecp5 \
@@ -27,33 +40,37 @@ This produces:
 ./build/gpt2.zip
 ```
 
-Containing the full RTL package (`top.v`, per-layer modules, weights,
+Containing the RTL package (`top.v`, per-layer modules, weights,
 testbench, synthesis scripts). Unzip and run:
 
 ```bash
 unzip -d gpt2 ./build/gpt2.zip
 cd gpt2
 make sim          # cocotb + Verilator simulation
-make synth-yosys  # ECP5 synthesis
+make synth-yosys  # ECP5 synthesis (requires yosys + nextpnr)
 ```
 
-## API
+> **Note**: the worker pipeline currently uses a synthesized model graph
+> rather than real `torch.fx` parsing, and quantization tracks the config
+> without yet packing weight tensors. The shape of the output is final;
+> the kernel work to fill in the bytes is the next phase. See the
+> [roadmap](/docs/roadmap) for what's wired versus stubbed.
+
+## REST API (not yet deployed)
+
+The FastAPI backend in `apps/api` is fully implemented locally but has no
+public deployment yet. To run it on your own machine:
 
 ```bash
-curl -X POST https://api.asicify.com/api/projects \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "gpt2 on tsmc28",
-    "model_source": {"type": "huggingface", "id": "gpt2"},
-    "compression": {
-      "quantization": "int4",
-      "sparsity": {"type": "structured_2_4", "ratio": 0.5},
-      "decomposition": {"type": "none"}
-    },
-    "targets": ["tsmc28", "ecp5"]
-  }'
+docker compose -f infra/docker-compose.yml up -d   # Postgres + Redis + MinIO
+cd apps/api
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+# OpenAPI docs at http://localhost:8000/docs
 ```
 
-Then `POST /api/projects/{id}/compress` to start the job. Stream progress via
-the WebSocket at `wss://api.asicify.com/api/projects/{id}/progress`.
+The endpoint surface is documented in
+[docs/internals/api.md](/docs/internals/api). When the hosted version
+goes live, this section will get a public base URL and an auth token
+example.

@@ -1,67 +1,129 @@
-// {{ layer.name }} — fixed-coefficient matrix-vector product
-// in_features={{ layer.in_features }}  out_features={{ layer.out_features }}
-// param_count={{ layer.param_count }}  multiplier={{ multiplier }}
+// {{ layer_view.name }}
+// in_features = {{ layer_view.in_features }}
+// out_features = {{ layer_view.out_features }}
+// Quantization: {{ layer_view.quantization }}
+// Multiplier strategy: {{ multiplier }}
+//
+// Computes:
+//   acc[o]   = bias_q[o] + sum_i  x[i] * unpack(W[o], i)    (signed int32)
+//   y_q63[o] = acc[o] * SCALE_Q31[o]                         (signed 64-bit)
+//   y[o]     = y_q63[o] >>> 31                               (arith. right shift)
+//
+// The `unpack(W[o], i)` operator depends on multiplier strategy:
+//   booth         (INT8): W[o][i] is already an 8-bit signed value
+//   csd_shift_add (INT4): unpack low/high nibble from W[o][i/2], sign-extend 4->32
+//   sign_flip_mux (TER) : decode 2-bit code from W[o][i/4][2*(i%4) +: 2]
+//   xnor_popcount (BIN) : bit i of W[o][i/8], -1 if 0 else +1
 
 `default_nettype none
 
-module {{ layer.name | replace('.', '_') }} #(
-    parameter integer DATA_WIDTH = 8,
-    parameter integer IN_FEATURES  = {{ layer.in_features }},
-    parameter integer OUT_FEATURES = {{ layer.out_features }}
-) (
-    input  wire                  clk,
-    input  wire                  rst_n,
-    input  wire                  in_valid,
-    output wire                  in_ready,
-    input  wire [DATA_WIDTH-1:0] in_data,
-    output reg                   out_valid,
-    input  wire                  out_ready,
-    output reg  [DATA_WIDTH-1:0] out_data
+module layer_{{ layer_view.symbol }} (
+    input  wire                          clk,
+    input  wire                          rst_n,
+
+    input  wire                          in_valid,
+    output wire                          in_ready,
+    input  wire signed [7:0]             in_data,
+
+    output reg                           out_valid,
+    input  wire                          out_ready,
+    output reg  signed [31:0]            out_data
 );
 
-    // Weights are hardwired via `weights/weights.vh`. The synthesis flow
-    // turns these into a mask ROM; place-and-route flattens the constants
-    // into the multiplier inputs (CSD / XNOR / Booth depending on precision).
-    `include "weights/weights.vh"
+    localparam int IN_FEATURES  = {{ layer_view.in_features }};
+    localparam int OUT_FEATURES = {{ layer_view.out_features }};
 
-    localparam integer ACC_WIDTH = 32;
-    reg [ACC_WIDTH-1:0] accumulator [0:OUT_FEATURES-1];
+    `include "weights.vh"
+
+    reg signed [31:0] acc [0:OUT_FEATURES-1];
     reg [$clog2(IN_FEATURES+1)-1:0] in_idx;
+    reg [$clog2(OUT_FEATURES+1)-1:0] out_idx;
+    reg streaming;
 
-    assign in_ready = ~out_valid | out_ready;
+    assign in_ready = ~streaming;
+
+    integer o;
+    reg signed [63:0] product;
+    reg signed [63:0] rescaled;
+    reg signed [7:0]  w_unpacked;
+
+    // ------------------------------------------------------------------
+    // unpack_w(o, i) returns the signed-extended weight at row o, col i.
+    // The function body changes per multiplier strategy.
+    // ------------------------------------------------------------------
+    function automatic signed [7:0] unpack_w (input integer o, input integer i);
+        reg [7:0] byte_val;
+        reg [3:0] nibble;
+        reg [1:0] code;
+        reg       bit_val;
+        begin
+{% if multiplier == 'booth' %}
+            unpack_w = W_{{ layer_view.symbol }}[o][i];
+{% elif multiplier == 'csd_shift_add' %}
+            byte_val = W_{{ layer_view.symbol }}[o][i >> 1];
+            nibble = (i[0] == 1'b0) ? byte_val[3:0] : byte_val[7:4];
+            // Sign-extend 4 -> 8 bits.
+            unpack_w = {{ '{{4{nibble[3]}}' }}, nibble };
+{% elif multiplier == 'sign_flip_mux' %}
+            byte_val = W_{{ layer_view.symbol }}[o][i >> 2];
+            code = byte_val >> (2 * (i[1:0]));
+            unpack_w = (code == 2'b00) ?  8'sd0  :
+                       (code == 2'b01) ?  8'sd1  :
+                                         -8'sd1;
+{% elif multiplier == 'xnor_popcount' %}
+            byte_val = W_{{ layer_view.symbol }}[o][i >> 3];
+            bit_val = byte_val[i[2:0]];
+            unpack_w = bit_val ? 8'sd1 : -8'sd1;
+{% else %}
+            // fp16_lut placeholder: treat W as int8.
+            unpack_w = W_{{ layer_view.symbol }}[o][i];
+{% endif %}
+        end
+    endfunction
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             in_idx    <= '0;
+            out_idx   <= '0;
             out_valid <= 1'b0;
             out_data  <= '0;
-            for (int i = 0; i < OUT_FEATURES; i = i + 1)
-                accumulator[i] <= '0;
-        end else if (in_valid && in_ready) begin
-            // {{ multiplier }} multiplier strategy: see ASICify docs
-            for (int o = 0; o < OUT_FEATURES; o = o + 1) begin
-{% if multiplier == 'xnor_popcount' %}
-                accumulator[o] <= accumulator[o] + (~(in_data ^ W_{{ layer.name | replace('.', '_') }}[o][in_idx]) ? 1 : -1);
-{% elif multiplier == 'sign_flip_mux' %}
-                // Ternary: weight ∈ {-1, 0, +1}
-                case (W_{{ layer.name | replace('.', '_') }}[o][in_idx])
-                    2'b01:  accumulator[o] <= accumulator[o] + in_data;
-                    2'b11:  accumulator[o] <= accumulator[o] - in_data;
-                    default: accumulator[o] <= accumulator[o];
-                endcase
-{% else %}
-                accumulator[o] <= accumulator[o] +
-                                  $signed(in_data) * $signed(W_{{ layer.name | replace('.', '_') }}[o][in_idx]);
-{% endif %}
+            streaming <= 1'b0;
+            for (o = 0; o < OUT_FEATURES; o = o + 1) begin
+                acc[o] <= BIAS_Q_{{ layer_view.symbol }}[o];
             end
-            in_idx <= (in_idx == IN_FEATURES - 1) ? '0 : in_idx + 1;
-            if (in_idx == IN_FEATURES - 1) begin
+        end else if (!streaming) begin
+            if (in_valid) begin
+                for (o = 0; o < OUT_FEATURES; o = o + 1) begin
+                    w_unpacked = unpack_w(o, in_idx);
+                    acc[o] <= acc[o] + $signed(in_data) * $signed(w_unpacked);
+                end
+
+                if (in_idx == IN_FEATURES - 1) begin
+                    in_idx    <= '0;
+                    out_idx   <= '0;
+                    streaming <= 1'b1;
+                end else begin
+                    in_idx <= in_idx + 1;
+                end
+            end
+        end else begin
+            if (!out_valid || out_ready) begin
+                product  = $signed({32'sd0, acc[out_idx]}) *
+                           $signed({1'b0, SCALE_Q31_{{ layer_view.symbol }}[out_idx]});
+                rescaled = product >>> 31;
+                out_data  <= rescaled[31:0];
                 out_valid <= 1'b1;
-                // truncation / rescale happens here in the real implementation
-                out_data <= accumulator[0][DATA_WIDTH-1:0];
+
+                if (out_idx == OUT_FEATURES - 1) begin
+                    streaming <= 1'b0;
+                    out_idx   <= '0;
+                    for (o = 0; o < OUT_FEATURES; o = o + 1) begin
+                        acc[o] <= BIAS_Q_{{ layer_view.symbol }}[o];
+                    end
+                end else begin
+                    out_idx <= out_idx + 1;
+                end
             end
-        end else if (out_valid && out_ready) begin
-            out_valid <= 1'b0;
         end
     end
 

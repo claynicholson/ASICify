@@ -1,40 +1,90 @@
 """Cocotb testbench for {{ graph.name }}.
 
-Drives random inputs through the RTL, compares output to the Python reference,
-which is bit-exact for deterministic operations.
+Drives the same int8 input vectors through the RTL `top` module and through
+the bit-exact NumPy reference (reference.py). Asserts the int32 outputs match.
+
+Run with:
+    make sim
+which expands to (Verilator backend assumed):
+    cocotb-config --makefiles ...
+    cocotb runs the simulation, this test reports pass/fail.
+
+Requires:
+    pip install cocotb cocotb-test pytest
+    apt install verilator        (or brew install verilator)
 """
 
+from __future__ import annotations
+
+import os
 import random
+import sys
+
+# Make reference.py importable when cocotb runs from a tempdir.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from reference import reference_forward
+from reference import PIPELINE, reference_forward
+
+
+CLOCK_NS = 10
+N_TRIALS = 8
+
+
+def _twos_complement(v: int, bits: int) -> int:
+    if v >= (1 << (bits - 1)):
+        v -= 1 << bits
+    return v
 
 
 @cocotb.test()
-async def smoke(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+async def bit_exact_random(dut):
+    """Drive N_TRIALS random int8 input vectors. Each one should produce
+    int32 outputs matching reference.py exactly.
+    """
+    cocotb.start_soon(Clock(dut.clk, CLOCK_NS, units="ns").start())
     dut.rst_n.value = 0
     dut.in_valid.value = 0
     dut.out_ready.value = 1
-    await Timer(50, units="ns")
+    await Timer(5 * CLOCK_NS, units="ns")
     dut.rst_n.value = 1
-    await Timer(50, units="ns")
+    await RisingEdge(dut.clk)
 
-    inputs = [random.randint(0, 255) for _ in range(64)]
-    expected = reference_forward(inputs)
+    if not PIPELINE:
+        return  # nothing to test (graph had no linear layers)
 
-    actual = []
-    for x in inputs:
-        dut.in_data.value = x
-        dut.in_valid.value = 1
-        await RisingEdge(dut.clk)
-        if int(dut.out_valid.value):
-            actual.append(int(dut.out_data.value))
-    dut.in_valid.value = 0
+    in_features = PIPELINE[0]["in_features"]
+    out_features = PIPELINE[-1]["out_features"]
 
-    # Bit-exactness check (deterministic ops only)
-    for i, (a, e) in enumerate(zip(actual, expected)):
-        assert a == e, f"mismatch at {i}: got {a}, expected {e}"
+    random.seed(42)
+
+    for trial in range(N_TRIALS):
+        inputs = [random.randint(-128, 127) for _ in range(in_features)]
+        expected = reference_forward(inputs).tolist()
+
+        # Drive inputs.
+        for v in inputs:
+            dut.in_data.value = v & 0xFF
+            dut.in_valid.value = 1
+            await RisingEdge(dut.clk)
+        dut.in_valid.value = 0
+
+        # Collect outputs.
+        actual: list[int] = []
+        # Allow up to 2 * (in + out) cycles for the pipeline to drain.
+        for _ in range(2 * (in_features + out_features) + 16):
+            await RisingEdge(dut.clk)
+            if int(dut.out_valid.value):
+                v = int(dut.out_data.value)
+                actual.append(_twos_complement(v, 32))
+                if len(actual) == out_features:
+                    break
+
+        assert actual == expected, (
+            f"trial {trial}: actual {actual} != expected {expected}"
+        )
+
+    cocotb.log.info(f"bit-exact: {N_TRIALS} trials passed")

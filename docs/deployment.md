@@ -26,22 +26,18 @@ listens on `0.0.0.0:3000`, and reaps signals via `tini`.
 
 ## Environment variables
 
-The image picks up these at runtime:
+The image picks these up at runtime:
 
-| Variable                   | Default                  | Purpose                              |
-| -------------------------- | ------------------------ | ------------------------------------ |
-| `PORT`                     | `3000`                   | Bind port for the Next.js server.    |
-| `HOSTNAME`                 | `0.0.0.0`                | Bind host. Leave alone in containers.|
-| `NODE_ENV`                 | `production`             | Don't override.                      |
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000`  | Backend API for the rewrite proxy. Only matters when the backend is wired. |
+| Variable    | Default      | Purpose                                |
+| ----------- | ------------ | -------------------------------------- |
+| `PORT`      | `3000`       | Bind port for the Next.js server.      |
+| `HOSTNAME`  | `0.0.0.0`    | Bind host. Leave alone in containers.  |
+| `NODE_ENV`  | `production` | Don't override.                        |
 
-Example with a real backend:
-
-```bash
-docker run --rm -p 3000:3000 \
-  -e NEXT_PUBLIC_API_BASE_URL=https://api.asicify.example \
-  asicify/web
-```
+The web app is fully self-contained today. The playground runs in the
+browser; the docs are baked into the image. No database, no API, no Redis.
+If the API and worker get deployed in the future, the web app will gain a
+`NEXT_PUBLIC_API_BASE_URL` env var to point at them.
 
 ## Image anatomy
 

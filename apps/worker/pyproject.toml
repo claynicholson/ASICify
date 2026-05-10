@@ -1,33 +1,38 @@
 [project]
 name = "asicify-worker"
 version = "0.1.0"
-description = "ASICify worker — compression pipeline, RTL generation, hardware estimation"
+description = "ASICify worker. Compression pipeline, RTL generation, hardware estimation."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
+    # Core compiler. Minimal install.
     "torch>=2.5.0",
-    "transformers>=4.45.0",
-    "accelerate>=1.0.0",
-    "datasets>=3.0.0",
-    "safetensors>=0.4.5",
-    "bitsandbytes>=0.44.0; platform_system != 'Darwin'",
     "numpy>=2.1.0",
     "pydantic>=2.9.0",
-    "redis>=5.1.1",
-    "boto3>=1.35.0",
     "jinja2>=3.1.4",
-    "httpx>=0.27.2",
     "structlog>=24.4.0",
-    "modal>=0.66.0",
 ]
 
 [project.optional-dependencies]
+# Hosted-stack workers and the HF-model loader live here.
+hosted = [
+    "transformers>=4.45.0",
+    "accelerate>=1.0.0",
+    "safetensors>=0.4.5",
+    "redis>=5.1.1",
+    "boto3>=1.35.0",
+    "httpx>=0.27.2",
+    "modal>=0.66.0",
+]
 dev = [
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pytest>=8.3.0",
-    "cocotb>=1.9.0",
+    "pytest-asyncio>=0.24.0",
 ]
+
+[project.scripts]
+asicify = "worker.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,8 +1,15 @@
 """Bit-exact Python reference for {{ graph.name }}.
 
-This file is generated alongside the RTL. It must produce the same outputs as
-the synthesized hardware for any deterministic input — the cocotb testbench
-relies on this for verification.
+This file mirrors the arithmetic in the generated Verilog. Drive both with
+the same int8 input stream and the outputs match exactly.
+
+Layout matches what's in weights.vh:
+  W_<symbol>          int8 weights, shape (out_features, in_features)
+  SCALE_Q31_<symbol>  per-output-channel Q0.31 fixed-point scale
+  BIAS_Q_<symbol>     per-output-channel bias in pre-rescale int32 units
+
+The reference uses int64 for the rescale product so we exactly match the
+64-bit signed multiply + arithmetic right shift in the RTL.
 
 Quantization: {{ config.quantization }}
 Multiplier:   {{ multiplier }}
@@ -10,19 +17,84 @@ Multiplier:   {{ multiplier }}
 
 from __future__ import annotations
 
+import json
+import sys
+from typing import Iterable
 
-def reference_forward(inputs: list[int]) -> list[int]:
-    """Apply the compressed model's forward pass to a sequence of integer inputs.
+import numpy as np
 
-    The full implementation loads the same weight tensors that were packed into
-    `weights/weights.vh` and applies them with the same fixed-point arithmetic
-    used by the multiplier strategy.
-    """
-    # Stub: identity. Replace with the actual layer-by-layer math in production.
-    return list(inputs)
+# ---------------------------------------------------------------------------
+# Weight tables (filled by the generator)
+# ---------------------------------------------------------------------------
+
+WEIGHTS = {{ weights_json }}
+
+# ---------------------------------------------------------------------------
+# Pipeline definition
+# ---------------------------------------------------------------------------
+
+PIPELINE = [
+{% for view in pipeline %}
+    {
+        "name": "{{ view.name }}",
+        "symbol": "{{ view.symbol }}",
+        "in_features": {{ view.in_features }},
+        "out_features": {{ view.out_features }},
+    },
+{% endfor %}
+]
+
+
+def _layer_forward(
+    x_int8: np.ndarray,
+    w_int8: np.ndarray,
+    scale_q31: np.ndarray,
+    bias_q: np.ndarray,
+) -> np.ndarray:
+    """Compute one Linear layer in the same arithmetic the RTL uses."""
+    x = x_int8.astype(np.int64)
+    w = w_int8.astype(np.int64)
+    acc = w @ x + bias_q.astype(np.int64)
+
+    product = acc * scale_q31.astype(np.int64)
+    rescaled = product >> 31  # arithmetic right shift, matches >>> 31 in SV
+    return rescaled.astype(np.int32)
+
+
+def _saturating_clip_int8(x: np.ndarray) -> np.ndarray:
+    return np.clip(x, -128, 127).astype(np.int8)
+
+
+def reference_forward(x_int8: Iterable[int]) -> np.ndarray:
+    """Run the full pipeline on a single int8 input vector."""
+    x = np.asarray(list(x_int8), dtype=np.int8)
+    if PIPELINE and x.shape[0] != PIPELINE[0]["in_features"]:
+        raise ValueError(
+            f"input length {x.shape[0]} != first layer in_features "
+            f"{PIPELINE[0]['in_features']}"
+        )
+
+    for i, stage in enumerate(PIPELINE):
+        sym = stage["symbol"]
+        w_int8 = np.array(WEIGHTS[f"W_{sym}"], dtype=np.int8)
+        scale_q31 = np.array(WEIGHTS[f"SCALE_Q31_{sym}"], dtype=np.int64)
+        bias_q = np.array(WEIGHTS[f"BIAS_Q_{sym}"], dtype=np.int64)
+        y_int32 = _layer_forward(x, w_int8, scale_q31, bias_q)
+
+        if i < len(PIPELINE) - 1:
+            x = _saturating_clip_int8(y_int32)
+        else:
+            return y_int32
+
+    return np.zeros(0, dtype=np.int32)
+
+
+def main() -> int:
+    inp = json.loads(sys.stdin.read() or "[]")
+    y = reference_forward(inp)
+    json.dump(y.tolist(), sys.stdout)
+    return 0
 
 
 if __name__ == "__main__":
-    import sys
-    xs = [int(x) for x in sys.argv[1:]] or [0, 1, 2, 3]
-    print(reference_forward(xs))
+    sys.exit(main())

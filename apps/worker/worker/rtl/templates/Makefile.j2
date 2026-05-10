@@ -1,29 +1,56 @@
-# ASICify generated Makefile
-# Targets: sim | synth-yosys | synth-vivado | clean
+# ASICify generated Makefile for {{ graph.name }}
+# Targets: sim | lint | synth-yosys | synth-vivado | clean
 
 TOPLEVEL_LANG ?= verilog
 TOPLEVEL := top
 MODULE   := tb_top
+SIM      ?= verilator
 
-VERILOG_SOURCES := $(wildcard ./*.v) $(wildcard modules/*.v)
+VERILOG_SOURCES := top.v $(wildcard modules/*.v) softmax.v kv_cache.v
+EXTRA_ARGS      += --trace --trace-fst -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNUSEDSIGNAL
 
-.PHONY: sim synth-yosys synth-vivado clean
+.PHONY: sim lint synth-yosys synth-vivado clean
 
+# ---------------------------------------------------------------------------
+# Simulation. Requires: verilator + cocotb on the host.
+#   apt install verilator
+#   pip install cocotb numpy
+# ---------------------------------------------------------------------------
 sim:
-	@echo "Running cocotb simulation with Verilator…"
+	@command -v verilator >/dev/null 2>&1 || { \
+	    echo "verilator not found; install with: apt install verilator"; exit 1; }
+	@command -v cocotb-config >/dev/null 2>&1 || { \
+	    echo "cocotb not found; install with: pip install cocotb"; exit 1; }
+	@echo "Running cocotb simulation with $(SIM)..."
 	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
-	    SIM=verilator TOPLEVEL=$(TOPLEVEL) MODULE=$(MODULE) \
-	    VERILOG_SOURCES="$(VERILOG_SOURCES)"
+	    SIM=$(SIM) TOPLEVEL=$(TOPLEVEL) MODULE=$(MODULE) \
+	    TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
+	    VERILOG_SOURCES="$(VERILOG_SOURCES)" \
+	    EXTRA_ARGS="$(EXTRA_ARGS)"
 
+# ---------------------------------------------------------------------------
+# Lint-only. Fast feedback in CI without running the testbench.
+# ---------------------------------------------------------------------------
+lint:
+	verilator --lint-only -Wall -Wno-DECLFILENAME $(VERILOG_SOURCES)
+
+# ---------------------------------------------------------------------------
+# ECP5 synthesis (open-source flow).
+# ---------------------------------------------------------------------------
 synth-yosys:
-	@echo "Synthesizing for ECP5 with yosys + nextpnr…"
+	@command -v yosys >/dev/null 2>&1 || { \
+	    echo "yosys not found; install with: apt install yosys"; exit 1; }
 	yosys -c synthesis/yosys.tcl
 	bash synthesis/nextpnr.sh
 
+# ---------------------------------------------------------------------------
+# Xilinx synthesis (Vivado).
+# ---------------------------------------------------------------------------
 synth-vivado:
-	@echo "Synthesizing for Xilinx with Vivado…"
+	@command -v vivado >/dev/null 2>&1 || { \
+	    echo "vivado not found; install Vivado from amd.com"; exit 1; }
 	vivado -mode batch -source synthesis/vivado.tcl
 
 clean:
-	rm -rf sim_build results.xml *.vcd *.log
-	rm -rf build/
+	rm -rf sim_build results.xml *.vcd *.fst *.log
+	rm -rf build/ obj_dir/

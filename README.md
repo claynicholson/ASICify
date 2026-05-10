@@ -65,16 +65,25 @@ $ pnpm --filter @asicify/web dev
 $ open http://localhost:3001/playground
 ```
 
-### 2. Compile to RTL via the CLI
+### 2. Compile to RTL via the CLI (from source)
+
+There is no PyPI package yet. The CLI runs from a clone:
 
 ```bash
-$ asicify compile gpt2 \
+git clone https://github.com/claynicholson/asicify
+cd asicify/apps/worker
+uv sync
+uv run asicify compile gpt2 \
     --quantization int4 \
     --sparsity 2:4 \
     --target tsmc28,ecp5
+```
 
+Sample output:
+
+```
 ✓ Parsed model graph         (124M params, 12 layers)
-✓ Quantized to INT4          (perplexity 24.3 → 25.1)
+✓ Quantized to INT4          (perplexity 24.3 to 25.1)
 ✓ Applied 2:4 sparsity       (50% zeros)
 ✓ Generated RTL              (top.v + 47 modules)
 ✓ Estimated tsmc28           (8.2 mm², $4.10 @ 100K)
@@ -85,14 +94,15 @@ Output: ./build/gpt2-int4-2_4/
 
 The output is a zip with `top.v`, per-layer modules, hardwired weights,
 Cocotb testbench, bit-exact Python reference, Makefile, and synthesis
-scripts for Yosys / nextpnr / Vivado. Unzip and `make sim` or
-`make synth-yosys` immediately.
+scripts for Yosys, nextpnr, and Vivado. Unzip and `make sim` or
+`make synth-yosys`.
 
-### 3. Run the full hosted pipeline
+### 3. Run the full local stack
 
-API + worker + Postgres + Redis + R2-compatible object storage, all wired
-together via docker-compose. Full project lifecycle, real-time progress
-streaming over WebSocket, presigned downloads.
+The API and worker are implemented but not yet deployed publicly. To run
+them on your own machine, see [Quickstart → REST API](./docs/quickstart.md#rest-api-not-yet-deployed).
+You get the project lifecycle, WebSocket progress streaming, and presigned
+artifact downloads.
 
 ## What's wired today
 
