@@ -1,0 +1,52 @@
+# Dependencies + build output (we'll regenerate these inside the image)
+**/node_modules
+**/.pnpm-store
+**/.next
+**/.turbo
+**/dist
+**/build
+**/*.tsbuildinfo
+
+# Python (not needed for the web app image)
+**/__pycache__
+**/.venv
+**/.uv
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+apps/api
+apps/worker
+
+# Local infra
+infra
+.env
+.env.*
+!.env.example
+
+# Editor + OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Git + CI
+.git
+.github
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# Large binaries that have no business in the image
+*.pt
+*.safetensors
+*.bin
+*.onnx
+*.zip
+artifacts
+output
+models/cache
+
+# Local Docker outputs
+docker-compose.override.yml

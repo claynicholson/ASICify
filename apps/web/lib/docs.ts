@@ -29,6 +29,7 @@ export const DOC_SECTIONS: DocSection[] = [
     title: "Getting started",
     items: [
       { slug: "quickstart", label: "Quickstart", description: "Compile your first model in 5 minutes." },
+      { slug: "deployment", label: "Deployment", description: "Build and run the Docker image." },
     ],
   },
   {
