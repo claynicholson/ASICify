@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <title>ASICify</title>
+  <!-- Die substrate -->
+  <rect width="16" height="16" rx="3" fill="#0A0B0E"/>
+  <!-- Corner registration marks (silicon fiducials) -->
+  <rect x="2"  y="2"  width="2" height="2" rx="0.5" fill="#1E2A3D"/>
+  <rect x="12" y="2"  width="2" height="2" rx="0.5" fill="#1E2A3D"/>
+  <rect x="2"  y="12" width="2" height="2" rx="0.5" fill="#1E2A3D"/>
+  <rect x="12" y="12" width="2" height="2" rx="0.5" fill="#1E2A3D"/>
+  <!-- Center transistor bar (the | in ASIC|fy) -->
+  <rect x="7"  y="2"  width="2" height="12" rx="0.5" fill="#5B8FF9"/>
+</svg>
