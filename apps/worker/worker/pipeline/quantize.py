@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from worker.kernels.layers import quantize_embedding, quantize_layernorm
+from worker.kernels.layers import (
+    quantize_attention,
+    quantize_embedding,
+    quantize_layernorm,
+)
 from worker.kernels.quantize import quantize_linear
 from worker.types import CompressionConfig, ModelGraph, Quantization
 
@@ -24,7 +28,8 @@ def quantize_graph(graph: ModelGraph, config: CompressionConfig) -> ModelGraph:
 
     weights = graph.metadata.get("_weights", {})
     biases = graph.metadata.get("_biases", {})
-    modules = graph.metadata.get("_modules", {})  # filled by parser for layernorm/embedding
+    modules = graph.metadata.get("_modules", {})
+    attn_parents = graph.metadata.get("_attention_parents", {})
 
     for layer in graph.layers:
         # Sensitivity: LayerNorm and Embedding stay at int8 even at lower precisions.
@@ -42,6 +47,15 @@ def quantize_graph(graph: ModelGraph, config: CompressionConfig) -> ModelGraph:
             quantized[layer.name] = quantize_layernorm(modules[layer.name])
         elif layer.kind == "embedding" and layer.name in modules:
             quantized[layer.name] = quantize_embedding(modules[layer.name])
+        elif layer.kind == "attention" and layer.name in attn_parents:
+            attn = attn_parents[layer.name]
+            q, k, v, o = attn["q"], attn["k"], attn["v"], attn["o"]
+            quantized[layer.name] = quantize_attention(
+                q.weight, k.weight, v.weight, o.weight,
+                q.bias, k.bias, v.bias, o.bias,
+                embed_dim=int(attn["embed_dim"]),
+                num_heads=int(attn["num_heads"]),
+            )
 
     new_graph = replace(graph, quantization=new_quant)
     new_graph.metadata = dict(graph.metadata)

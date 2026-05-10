@@ -29,6 +29,92 @@ from worker.types import LayerInfo, ModelGraph
 _ACTIVATION_NAMES = {"relu", "gelu", "silu", "tanh", "sigmoid"}
 
 
+# Common attention-projection naming patterns across HF model families.
+# Each tuple is (q, k, v, o). The detector tries each pattern and matches the
+# first one whose immediate children all exist as nn.Linear submodules.
+_ATTENTION_PATTERNS: list[tuple[str, str, str, str]] = [
+    ("q_proj", "k_proj", "v_proj", "o_proj"),     # llama, mistral, gemma
+    ("query", "key", "value", "output.dense"),     # bert, distilbert (output is nested)
+    ("q_lin", "k_lin", "v_lin", "out_lin"),        # distilbert variants
+    ("Wq", "Wk", "Wv", "Wo"),                      # some research repos
+]
+
+
+def _detect_attention_parents(model: nn.Module) -> dict[str, dict[str, object]]:
+    """Walk the module tree, find modules whose children look like Q/K/V/O.
+
+    Returns a map `parent_name -> {q, k, v, o, embed_dim, num_heads, children, naming}`.
+    The four Linear modules under that parent are recorded so the quantizer can
+    pull their weights without going through the flat layer list.
+
+    Detection is heuristic: it matches by child name. Models that don't follow
+    one of the patterns in `_ATTENTION_PATTERNS` (e.g. GPT-2 fused `c_attn`)
+    fall through and the projections render as separate Linear layers like
+    before.
+    """
+    parents: dict[str, dict[str, object]] = {}
+    name_to_module = dict(model.named_modules())
+
+    for parent_name, parent_mod in name_to_module.items():
+        if parent_name == "":
+            continue
+        # Only look at modules with children.
+        children = dict(parent_mod.named_children())
+        if not children:
+            continue
+
+        for q_name, k_name, v_name, o_name in _ATTENTION_PATTERNS:
+            q = _resolve_dotted(parent_mod, q_name)
+            k = _resolve_dotted(parent_mod, k_name)
+            v = _resolve_dotted(parent_mod, v_name)
+            o = _resolve_dotted(parent_mod, o_name)
+            if not all(isinstance(m, nn.Linear) for m in (q, k, v, o)):
+                continue
+
+            embed_dim = q.in_features  # type: ignore[union-attr]
+            # Try to recover num_heads from the parent if it has the attribute.
+            num_heads = int(
+                getattr(parent_mod, "num_heads", None)
+                or getattr(parent_mod, "n_head", None)
+                or getattr(parent_mod, "n_heads", None)
+                or 1
+            )
+
+            parents[parent_name] = {
+                "q": q,
+                "k": k,
+                "v": v,
+                "o": o,
+                "embed_dim": embed_dim,
+                "num_heads": num_heads,
+                "children": {"q": q, "k": k, "v": v, "o": o},
+                "naming": (q_name, k_name, v_name, o_name),
+            }
+            break
+
+    return parents
+
+
+def _resolve_dotted(module: nn.Module, dotted: str) -> nn.Module | None:
+    """`module.foo.bar` lookup using the module's children, returning None on miss."""
+    cur: nn.Module | None = module
+    for part in dotted.split("."):
+        if cur is None:
+            return None
+        cur = getattr(cur, part, None)
+    return cur
+
+
+def _is_inside_attention(
+    module_name: str, attention_parents: dict[str, dict[str, object]]
+) -> bool:
+    """True if `module_name` is a strict descendant of any detected attention parent."""
+    for parent in attention_parents:
+        if module_name.startswith(parent + "."):
+            return True
+    return False
+
+
 def parse_module(
     model: nn.Module,
     name: str = "model",
@@ -47,9 +133,40 @@ def parse_module(
     bias_tensors: dict[str, torch.Tensor | None] = {}
     module_refs: dict[str, nn.Module] = {}
 
+    # First pass: detect attention parents so we can skip their inner Linears.
+    attention_parents = _detect_attention_parents(model)
+
     for module_name, module in model.named_modules():
         if module_name == "":
             continue  # skip the root
+
+        # If this module is itself an attention block, record it as one layer.
+        if module_name in attention_parents:
+            attn = attention_parents[module_name]
+            info = LayerInfo(
+                name=module_name,
+                kind="attention",
+                in_features=attn["embed_dim"],
+                out_features=attn["embed_dim"],
+                param_count=sum(
+                    p.numel()
+                    for child in attn["children"].values()
+                    for p in child.parameters()
+                ),
+                metadata={
+                    "num_heads": attn["num_heads"],
+                    "head_dim": attn["embed_dim"] // attn["num_heads"],
+                    "naming": attn["naming"],
+                },
+            )
+            layers.append(info)
+            total_params += info.param_count
+            module_refs[module_name] = module  # parent for later access
+            continue
+
+        # Skip Linears that live inside an attention parent we already recorded.
+        if _is_inside_attention(module_name, attention_parents):
+            continue
 
         kind, info = _classify_module(module_name, module)
         if kind is None:
@@ -82,6 +199,7 @@ def parse_module(
     graph.metadata["_biases"] = bias_tensors
     graph.metadata["_modules"] = module_refs
     graph.metadata["_root_module"] = model
+    graph.metadata["_attention_parents"] = attention_parents
     return graph
 
 

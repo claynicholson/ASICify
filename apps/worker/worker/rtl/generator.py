@@ -25,7 +25,11 @@ import json
 import torch
 
 from worker.kernels.attention import build_softmax_lut
-from worker.kernels.layers import QuantizedEmbedding, QuantizedLayerNorm
+from worker.kernels.layers import (
+    QuantizedAttention,
+    QuantizedEmbedding,
+    QuantizedLayerNorm,
+)
 from worker.kernels.pack import pack_embedding, pack_layer, pack_layernorm
 from worker.pipeline.orchestrator import _cfg_from_dict
 from worker.pipeline.parse import parse_model
@@ -73,6 +77,24 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
     linear_views = []
     layernorm_views = []
     embedding_views = []
+    attention_views = []
+
+    # Per-attention-block synthetic Linear views, threaded into linear_views
+    # so weights.vh emits their constants and per-projection modules render.
+    def _attn_proj_view(parent_symbol: str, projection: str, q_proj) -> dict[str, Any]:
+        sym = f"{parent_symbol}_{projection}"
+        return {
+            "kind": "linear",
+            "name": f"{parent_symbol}.{projection}",
+            "symbol": sym,
+            "module_name": f"layer_{sym}",
+            "in_features": q_proj.in_features,
+            "out_features": q_proj.out_features,
+            "has_bias": q_proj.bias is not None,
+            "quantization": q_proj.quantization,
+            "weights_decl": pack_layer(sym, q_proj),
+            "quantized": q_proj,
+        }
 
     for layer in graph.layers:
         symbol = _safe_symbol(layer.name)
@@ -118,6 +140,28 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
                     "quantized": q,
                 }
             )
+        elif layer.kind == "attention" and isinstance(q, QuantizedAttention):
+            # Each projection becomes a normal Linear module; the attention
+            # wrapper instantiates and wires them together.
+            for proj_name, proj_q in (
+                ("q", q.q_proj),
+                ("k", q.k_proj),
+                ("v", q.v_proj),
+                ("o", q.o_proj),
+            ):
+                linear_views.append(_attn_proj_view(symbol, proj_name, proj_q))
+            attention_views.append(
+                {
+                    "kind": "attention",
+                    "name": layer.name,
+                    "symbol": symbol,
+                    "module_name": f"attention_{symbol}",
+                    "embed_dim": q.embed_dim,
+                    "num_heads": q.num_heads,
+                    "head_dim": q.head_dim,
+                    "quantized": q,
+                }
+            )
 
     # Pipeline includes everything in declaration order so top.v can wire layers
     # together. For now top.v only chains linear layers; LN/Embedding modules
@@ -145,6 +189,7 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
         "linear_views": linear_views,
         "layernorm_views": layernorm_views,
         "embedding_views": embedding_views,
+        "attention_views": attention_views,
         "pipeline": pipeline,
         "weights_json": weights_json,
         "random_input_example": json.dumps([0] * first_in) if first_in else "[]",
@@ -172,6 +217,11 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
     for view in embedding_views:
         files[f"modules/{view['module_name']}.v"] = env.get_template(
             "embedding.v.j2"
+        ).render(layer_view=view, **ctx)
+
+    for view in attention_views:
+        files[f"modules/{view['module_name']}.v"] = env.get_template(
+            "attention_block.v.j2"
         ).render(layer_view=view, **ctx)
 
     # Shared submodules (always emitted; layers may or may not use them).

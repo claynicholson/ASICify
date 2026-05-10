@@ -229,6 +229,44 @@ def quantize_linear_binary(
 
 
 # ---------------------------------------------------------------------------
+# FP16 (full half-precision floats; no integer scale)
+# ---------------------------------------------------------------------------
+
+
+def quantize_linear_fp16(
+    weight: torch.Tensor,
+    bias: torch.Tensor | None = None,
+) -> QuantizedLinear:
+    """FP16 storage. Float path through the compiler; not integer.
+
+    Unlike the INT8/INT4/ternary/binary kernels, FP16 doesn't quantize at all
+    in the loss sense — it just downcasts FP32 to FP16. The scale field
+    carries a sentinel of 1.0 so the integer rescale path can be skipped, and
+    the `weight_int8` field stores the FP16 weights cast directly (using
+    `weight_int8` as the canonical-storage-tensor, even though dtype is fp16).
+    The pack module sees `q.quantization == "fp16"` and emits 16-bit
+    `localparam` literals instead of int8.
+
+    Bit-exactness for FP16 means "matches IEEE-754 half-precision arithmetic",
+    not the integer bit-exact contract that the int paths satisfy. The Verilog
+    FP16 multiplier and the Python reference use the same fp16 dtype.
+    """
+    if weight.dim() != 2:
+        raise ValueError(f"expects 2D weight; got {tuple(weight.shape)}")
+    w_fp16 = weight.detach().to(torch.float16)
+    out_features, in_features = w_fp16.shape
+
+    return QuantizedLinear(
+        quantization="fp16",
+        weight_int8=w_fp16,  # dtype=float16 (yes, the field name is a slight misnomer here)
+        scale=torch.ones(out_features, dtype=torch.float32),
+        bias=None if bias is None else bias.detach().to(torch.float16).clone(),
+        in_features=in_features,
+        out_features=out_features,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -248,10 +286,7 @@ def quantize_linear(
     if quantization == "binary":
         return quantize_linear_binary(weight, bias)
     if quantization == "fp16":
-        # FP16 in the RTL is a per-multiplier ROM-LUT. We still produce an int8
-        # placeholder so the rest of the pipeline can run, and bump the scale
-        # accordingly. A full FP16 multiplier kernel is a follow-up.
-        return quantize_linear_int8(weight, bias)
+        return quantize_linear_fp16(weight, bias)
     raise ValueError(f"unknown quantization: {quantization}")
 
 
