@@ -1,94 +1,139 @@
 # Roadmap
 
-What's actually shipped, what's stubbed, what's planned. Updated as work
-lands. Prefer the truth on this page over claims elsewhere in the repo.
+Honest "what's shipped vs what's next" — updated as work lands. If something
+on this page contradicts something elsewhere in the repo, this page is the
+source of truth.
 
 ## Shipped and verified
 
-The compiler core works end-to-end for the INT8 + Linear-only slice. The
-bit-exactness test in `apps/worker/tests/test_end_to_end.py` runs 32 random
-inputs through the in-process kernel and the generated `reference.py` and
-asserts identical int32 output, every commit.
+The compiler core works end-to-end across four quantization precisions. The
+bit-exactness contract (`kernel forward == generated reference.py`) is
+locked in by 62 pytest tests in
+[`apps/worker/tests/`](../apps/worker/tests/), running in ~5 seconds on CPU.
 
-- [x] Monorepo with Turborepo (web, api, worker, shared)
-- [x] Next.js 15 web app with live in-browser hardware estimator
-- [x] Markdown docs site rendered from `/docs/*.md`
+### Compiler
+
+- [x] Real `torch.fx`-style module walk in `worker/pipeline/parse.py` for
+      arbitrary stacks of `nn.Linear`, `nn.LayerNorm`, `nn.Embedding`,
+      `nn.MultiheadAttention`, plus standard activations
+- [x] Real INT8 symmetric per-output-channel quantization
+- [x] Real INT4 in [-7, 7] with per-row scale (CSD shift-add multiplier)
+- [x] Real ternary {-1, 0, +1} (TWN-style threshold + per-row scale)
+- [x] Real binary {-1, +1} with per-row alpha
+- [x] Multi-precision multiplier strategies all wired through real kernels:
+      `xnor_popcount`, `sign_flip_mux`, `csd_shift_add`, `booth`
+- [x] Real magnitude pruning: 2:4, 4:8, block-sparse 16x16, unstructured
+      (operates on float weights before quantization; zeros propagate)
+- [x] Binary-precision sparsity skip (binary can't represent zero)
+- [x] Real LayerNorm quantization (Q15 gamma/beta as int32)
+- [x] Real Embedding quantization (per-column INT8 ROM table)
+- [x] Integer softmax kernel with LUT-based exp + reference attention
+- [x] HuggingFace model loader (in `hosted` extra) — module / checkpoint /
+      huggingface dispatch
+- [x] Real activation-MSE validation: dequantize, run, compare per-layer
+      activations + end-to-end cosine similarity, ordering across precisions
+      verified by tests
+
+### RTL generation
+
+- [x] Synthesizable Verilog `linear_layer.v` with one `unpack_w` arm per
+      multiplier strategy
+- [x] `top.v` with multi-stage pipeline + inter-stage int8 saturating clip
+- [x] `weights.vh` with all hardwired constants (W, scale, bias, gamma,
+      beta, embeddings, softmax LUT)
+- [x] `layernorm.v` with Verilator-friendly int sqrt approximation
+- [x] `embedding.v` with ROM lookup
+- [x] `softmax.v` with LUT-based exp + max-subtract + normalize
+- [x] `kv_cache.v` as a real BRAM
+- [x] Bit-exact NumPy reference (`reference.py`) generated alongside the RTL
+- [x] Cocotb testbench (`tb_top.py`) with 8-trial random vector check
+- [x] `Makefile` with `sim` / `lint` / `synth-yosys` / `synth-vivado` targets
+      that detect missing tools and print install hints
+
+### Tooling
+
+- [x] `asicify demo` and `asicify estimate` CLI subcommands
+- [x] Hardware estimator with cell-library data for sky130, GF22FDX, TSMC
+      28/16/7, ECP5, CrossLink-NX, Artix-7, Kria, TinyTapeout, chipIgnite
 - [x] Production Docker image for the web app
-- [x] **Real `torch.fx` module walk** in `worker/pipeline/parse.py` for
-      arbitrary `nn.Linear` / `nn.LayerNorm` / `nn.Embedding` stacks
-- [x] **Real INT8 symmetric per-output-channel quantization** in
-      `worker/kernels/quantize.py`, with `<1%` reconstruction error on
-      Gaussian weights
-- [x] **Real weight packing** to SystemVerilog `localparam` literals in
-      `worker/kernels/pack.py` (signed 8-bit weights, Q0.31 scales,
-      pre-rescale int32 biases)
-- [x] **Real synthesizable Verilog** with hardwired weight constants
-      and a working int32 MAC + Q0.31 rescale pipeline
-- [x] **Bit-exact NumPy reference** generated alongside the RTL
-- [x] **`asicify demo` CLI** that goes model → quantize → render → verify
-      in one command
-- [x] **Pytest suite** with 16 tests covering the kernel, the pack module,
-      and the end-to-end pipeline
-- [x] Hardware estimator with cell-library data for sky130, GF22FDX,
-      TSMC 28/16/7, ECP5, CrossLink-NX, Artix-7, Kria, TinyTapeout,
-      chipIgnite
+- [x] FastAPI Dockerfile + Fly.io config (ready to deploy)
+- [x] Modal worker app definition (ready to deploy)
+- [x] GitHub Actions CI: pytest + Verilator lint + Yosys synth-check + web
+      build, all on every push
 
-## Partial
+### Web
 
-These are wired but only for the INT8 + Linear path. Other branches still
-exist as templates / typing only.
+- [x] Next.js landing, playground, markdown docs site, blog stub, about
+- [x] Live in-browser hardware estimator (sub-millisecond per slider move)
+- [x] PDF report generation via `@react-pdf/renderer` at `/api/report`
+- [x] WebGPU in-browser inference preview using `@huggingface/transformers`
+      with WASM fallback (DistilGPT-2 by default, ~80MB cached after first
+      load)
 
-- [~] Multi-precision multiplier strategies. Templates branch on
-      `multiplier` ∈ {`xnor_popcount`, `sign_flip_mux`, `csd_shift_add`,
-      `booth`, `fp16_lut`}, but only `booth` (INT8) is wired through real
-      kernels. INT4 / ternary / binary fall back to int8 quants today.
-- [~] Pipeline stages for sparsity and decomposition record their config
-      but do not yet pack masks or factor matrices into the RTL.
-- [~] Attention, LayerNorm, Embedding, and KV cache templates exist but
-      the generator only renders Linear modules into the package.
+## Partial — wired but not exhaustive
+
+- [~] **HF attention block auto-detection in the parser**. Q/K/V/O
+      projections render as separate Linear layers today, which is
+      correct but loses the structural relationship. A pass that
+      recognizes `XxxAttention` modules and groups their projections
+      into a `QuantizedAttention` is the next-largest piece of work.
+- [~] **FP16 quantization**. The dispatcher accepts `fp16` and the
+      `linear_layer.v.j2` template has an arm marked `fp16_lut`, but
+      the kernel currently falls back to int8 quantization for fp16.
+      A real FP16 kernel needs per-multiplier ROM-LUTs.
+- [~] **Decomposition**. The pipeline records the decomposition config
+      but doesn't yet factor matrices. Monarch and butterfly
+      factorization need both a kernel (factor float weights into
+      block-diagonal A and B) and template work (replace one Linear
+      with a chain of three smaller Linears).
 
 ## Not yet started
 
-- [ ] Real perplexity validation against held-out data (we use
-      reconstruction error today)
-- [ ] HuggingFace model loader (the `hosted` extra in `apps/worker/pyproject.toml`
-      includes `transformers` but the loader code isn't written)
-- [ ] Modal deployment for GPU jobs
-- [ ] Cocotb testbench actually exercising RTL via Verilator (the file is
-      generated; running it requires Verilator on the host)
-- [ ] End-to-end synthesis verification: compile a small model, run yosys
-      + nextpnr, get an ECP5 bitstream, flash to an actual board
-- [ ] WebGPU inference comparison (`transformers.js`) in the playground
-- [ ] PDF report generation
-- [ ] FastAPI backend deployed publicly (it's implemented locally; no
-      hosted instance yet)
+- [ ] **Public deployment of the API and worker.** The Dockerfiles and
+      Modal app are committed; no live URLs exist yet. Needs hosting
+      account credentials.
+- [ ] **End-to-end synthesis verification on real ECP5 hardware**. CI
+      runs `verilator --lint-only` and a Yosys synth-check, but no
+      bitstream is flashed to a board. The first time we wire this is
+      worth a blog post.
+- [ ] **Real perplexity validation against language data**. The
+      validator works against random Gaussian inputs; for token-input
+      models, you need a dataset. The hook is `validate_with_data`.
+- [ ] **Hardware-aware fine-tuning loop**. Short retraining run with
+      quantization simulated in the loop, straight-through estimator
+      for non-differentiable ops. Modal-backed.
+- [ ] **TinyTapeout submission integration**. We can target sky130, but
+      packaging for an actual TinyTapeout tile (with their pinout and
+      area limits) needs a separate template variant.
+- [ ] **Stripe billing**. Pricing page was deliberately removed when we
+      reframed as an open-source project.
 
 ## Where to focus next
 
-Highest leverage in priority order:
+In priority order:
 
-1. **HuggingFace model loader.** Wire `AutoModel.from_pretrained` →
-   `parse_module`. Unlocks real models without leaving the toolchain.
-2. **Verilator hookup.** The cocotb testbench template already exists.
-   Add a `make sim` that actually runs and asserts on RTL output. This
-   makes every commit verify the RTL matches the reference, not just
-   that the reference matches the kernel.
-3. **INT4 kernel.** The CSD shift-add multiplier is implemented in the
-   template; we need the quantization side: GPTQ-style per-channel INT4
-   plus a pack module that emits 4-bit constants. This is the precision
-   most users will actually want.
-4. **Attention block end-to-end.** Add Q/K/V projection parsing, the
-   softmax LUT, and the output projection; wire it into a small
-   transformer (DistilBERT or GPT-2 small) for a real demo.
-5. **Synthesis CI.** Run yosys + nextpnr on every push, fail the build
-   if any generated package fails synthesis.
+1. **Wire Verilator into the test loop.** The cocotb testbench is
+   generated; running it from CI takes one extra job step. This
+   upgrades the bit-exactness chain from `kernel ↔ reference.py` to
+   `kernel ↔ reference.py ↔ RTL`.
+2. **HF attention auto-detection.** Today HF transformers compile
+   correctly but render as a flat list of projections. Recognizing the
+   attention block as a unit unlocks the structural template and the
+   KV cache wiring.
+3. **First real ECP5 bitstream.** Pick a small model (DistilBERT
+   tiny), compile to int8, run yosys + nextpnr-ecp5 + ecppack, flash
+   to a $35 board, post a tweet with the build log. This is the
+   credibility moment.
+4. **Public API deployment.** Once the worker pipeline above is
+   demonstrably real, deploying the hosted version becomes a story
+   worth telling.
 
 ## Long-tail
 
 Real but lower priority until the above lands:
 
-- Monarch and butterfly decompositions
-- Hardware-aware fine-tuning loop
-- TinyTapeout submission helpers
-- Diffusion and Mamba primitives
+- WebGPU inference for *any* HF model (currently fixed to DistilGPT-2)
+- Diffusion / Mamba primitive support
 - Speculative decoding hardware partitioning
+- Self-hosted enterprise option with custom PDKs
+- Multi-model deployment with shared backbone

@@ -1,394 +1,422 @@
 # Extending ASICify
 
-How to add the things people will want to add. Each section is a recipe with
-file-by-file instructions and a sanity check.
+How to add the things people will want to add. Each recipe is concrete:
+file paths, the sequence of edits, the test that proves it works.
+
+## Recipe index
+
+- [Add a quantization precision](#add-a-quantization-precision)
+- [Add a sparsity pattern](#add-a-sparsity-pattern)
+- [Add a hardware target](#add-a-hardware-target)
+- [Add a layer kind (Conv2d, Mamba, MoE, etc.)](#add-a-layer-kind)
+- [Add a HuggingFace attention block parser](#add-a-hf-attention-parser)
+- [Add a CLI subcommand](#add-a-cli-subcommand)
+- [Add a database table](#add-a-database-table)
+- [Add a model to the catalog](#add-a-model-to-the-catalog)
+
+## Add a quantization precision
+
+Worked example: FP4 with shared exponent.
+
+### 1. Quantization kernel — `apps/worker/worker/kernels/quantize.py`
+
+```python
+def quantize_linear_fp4(weight, bias=None):
+    # FP4 E2M1: 1 sign + 2 exp + 1 mantissa, range ~[-6, 6]
+    w = weight.detach().to(torch.float32)
+    out_features, in_features = w.shape
+    max_abs = w.abs().amax(dim=1).clamp_min(1e-12)
+    scale = max_abs / 6.0
+    # Round to FP4-representable values (15 grid points + zero).
+    grid = torch.tensor([-6, -4, -3, -2, -1.5, -1, -0.5, 0,
+                          0.5, 1, 1.5, 2, 3, 4, 6])
+    normalized = w / scale.unsqueeze(1)
+    # Snap each weight to nearest grid point, store the index.
+    diffs = (normalized.unsqueeze(-1) - grid).abs()
+    indices = diffs.argmin(dim=-1).to(torch.int8)  # 0..14
+    # Map indices to the canonical "as-int8" form for storage.
+    quantized = (indices - 7).to(torch.int8)  # signed in [-7, 7]
+    return QuantizedLinear(
+        quantization="fp4",
+        weight_int8=quantized,
+        scale=scale.to(torch.float32),
+        bias=...,
+        ...
+    )
+```
+
+Then add to the dispatcher:
+
+```python
+def quantize_linear(weight, bias, quantization):
+    ...
+    if quantization == "fp4":
+        return quantize_linear_fp4(weight, bias)
+    ...
+```
+
+### 2. Pack — `apps/worker/worker/kernels/pack.py`
+
+```python
+def fp4_array_to_sv(name, tensor):
+    """Pack 15-value FP4 indices two-per-byte."""
+    # ... same shape as int4_array_to_sv but encoding indices 0..14.
+```
+
+Wire into `pack_layer`:
+
+```python
+elif q.quantization == "fp4":
+    weights_sv = fp4_array_to_sv(f"W_{symbol}", q.weight_int8)
+```
+
+### 3. Multiplier strategy — `apps/worker/worker/rtl/generator.py`
+
+```python
+def _multiplier_strategy(quantization):
+    return {
+        ...
+        "fp4": "fp4_lut",
+    }[quantization]
+```
+
+### 4. Verilog template — `apps/worker/worker/rtl/templates/linear_layer.v.j2`
+
+Add an `unpack_w` arm:
+
+```jinja
+{% elif multiplier == 'fp4_lut' %}
+    byte_val = W_<sym>[o][i >> 1];
+    nibble = (i[0] == 0) ? byte_val[3:0] : byte_val[7:4];
+    // 16-entry LUT mapping FP4 index -> int8 representation.
+    case (nibble)
+        4'd0: unpack_w = -8'sd6;
+        4'd1: unpack_w = -8'sd4;
+        ...
+        4'd15: unpack_w = 8'sd6;
+    endcase
+{% endif %}
+```
+
+The kernel forward already works because we store FP4 weights in
+canonical signed form (the stored int8 *is* the dequantized value
+times some scale; the linear math is the same). The pack/unpack is
+the only thing that changes per precision.
+
+### 5. Test — `apps/worker/tests/test_quantize_multi.py`
+
+Add `"fp4"` to the parametrize lists:
+
+```python
+@pytest.mark.parametrize("quantization", ["int8", "int4", "ternary", "binary", "fp4"])
+def test_reference_matches_kernel_for_each_precision(...)
+```
+
+Run `python -m uv run pytest tests/test_quantize_multi.py -v` and you'll
+see the new precision pass alongside the others.
+
+### 6. UI — `apps/web/components/playground/config-panel.tsx`
+
+Add `{ value: "fp4", label: "FP4", bits: "4 bit (E2M1)" }` to
+`QUANT_OPTIONS`.
+
+Update `apps/web/lib/estimator.ts`:
+
+```ts
+const BITS_PER_WEIGHT = { ..., fp4: 4 };
+const MUL_AREA_SCALE  = { ..., fp4: 0.25 };
+const QUALITY_PENALTY = { ..., fp4: 1.06 };
+```
+
+And the matching server-side estimator at
+`apps/worker/worker/estimator/area.py:MUL_SCALE`.
+
+## Add a sparsity pattern
+
+Worked example: 1:2 (half-density structured).
+
+### 1. Kernel — `apps/worker/worker/kernels/sparsity.py`
+
+```python
+def apply_1_to_2(weight):
+    """Each consecutive pair keeps the larger by |w|."""
+    out_f, in_f = weight.shape
+    pad = (2 - in_f % 2) % 2
+    w = torch.nn.functional.pad(weight, (0, pad))
+    grouped = w.reshape(out_f, -1, 2)
+    abs_w = grouped.abs()
+    _, idx = abs_w.topk(1, dim=-1)
+    mask = torch.zeros_like(grouped, dtype=torch.bool)
+    mask.scatter_(-1, idx, True)
+    out = (grouped * mask.to(grouped.dtype)).reshape(out_f, -1)
+    return out[:, :in_f]
+```
+
+### 2. Dispatcher
+
+```python
+def apply_sparsity(weight, sparsity_type, ratio):
+    ...
+    if sparsity_type == "structured_1_2":
+        return apply_1_to_2(weight)
+```
+
+### 3. Type — `packages/shared/src/types.ts`
+
+Add `"structured_1_2"` to the `SparsityType` union (mirror in the API
+schema and worker dataclass).
+
+### 4. UI — `apps/web/components/playground/config-panel.tsx`
+
+Add `{ value: "structured_1_2", label: "1:2 structured" }` to
+`SPARSITY_OPTIONS`.
+
+### 5. Test — `apps/worker/tests/test_sparsity.py`
+
+Mirror the existing 2:4 tests for the new pattern.
 
 ## Add a hardware target
 
-Goal: surface `My Target` in the playground dropdown, get area / cost
-estimates for it on both client and server, and have it appear in API
-responses.
+Worked example: TSMC 5nm.
 
 ### 1. TypeScript types — `packages/shared/src/types.ts`
 
-Add the new id to the `TargetId` union:
+Add `"tsmc5"` to `TargetId`. Add a `TargetSpec` to
+`packages/shared/src/targets.ts:TARGETS`.
+
+### 2. Client estimator — `apps/web/lib/estimator.ts`
+
+Add a row to `NODE_PARAMS`:
 
 ```ts
-export type TargetId =
-  | "sky130"
-  | …
-  | "my_target";
-```
-
-### 2. Shared target catalog — `packages/shared/src/targets.ts`
-
-Add a `TargetSpec`:
-
-```ts
-my_target: {
-  id: "my_target",
-  display_name: "My Target",
-  kind: "asic",            // or "fpga" or "shuttle"
-  process_node_nm: 65,
-  vendor: "Acme",
-  description: "One-line summary for the dropdown tooltip.",
-},
-```
-
-### 3. Client-side estimator — `apps/web/lib/estimator.ts`
-
-Add a row to `NODE_PARAMS`. For ASIC nodes:
-
-```ts
-my_target: {
-  rom_bit_um2: 0.40,
-  sram_bit_um2: 1.20,
-  mul_int8_um2: 720,
-  fmax_mhz: 800,
-  energy_int8_pj: 0.45,
-  wafer_cost: 3500,
+tsmc5: {
+  rom_bit_um2: 0.018,
+  sram_bit_um2: 0.06,
+  mul_int8_um2: 35,
+  fmax_mhz: 2800,
+  energy_int8_pj: 0.025,
+  wafer_cost: 17000,
   wafer_diameter: 300,
-  nre: 800_000,
-  defect_density: 0.18,
+  nre: 50_000_000,
+  defect_density: 0.07,
 },
 ```
 
-For FPGAs, add to `fpgaUnitCost(target)` and ensure
-`is_fpga`-style branch in `quickEstimate` treats it correctly. (FPGAs have
-a flat unit cost and no NRE in this model.)
+### 3. Server estimator — `apps/worker/worker/estimator/targets.py`
+
+Add a `NodeParams(...)` row to `ASIC_NODES` with the *same numbers*. The
+two estimators must stay in sync; refining one without the other gives
+a misleading playground.
 
 ### 4. API target catalog — `apps/api/app/data/targets.py`
 
-Add a matching `TargetSpec(...)` entry to the `TARGETS` list, and a
-`COST_MODELS` entry with the same fields as the worker.
+Add a `TargetSpec(...)` entry to the `TARGETS` list.
 
-### 5. Pydantic types — `apps/api/app/schemas.py`
+### 5. Pydantic schema — `apps/api/app/schemas.py`
 
-Extend the `TargetId` `Literal` union with `"my_target"`.
+Extend the `TargetId` `Literal` union.
 
-### 6. Worker estimator — `apps/worker/worker/estimator/targets.py`
-
-Add a `NodeParams(...)` row to `ASIC_NODES` (or `FpgaParams` to `FPGAS`).
-**These numbers must match the client estimator** — see the sync rule in
-[codebase.md](../codebase.md#the-estimator-lives-in-two-places--on-purpose).
-
-### 7. Worker cost model — `apps/worker/worker/estimator/cost.py`
-
-If the target is a shuttle (TinyTapeout-style fixed-fee), add a branch to
-`estimate_cost`. ASIC nodes flow through `_asic_cost` automatically once
-they're in `ASIC_NODES`. FPGAs flow through `FPGAS` lookup.
-
-### 8. Sanity check
+### 6. Sanity check
 
 ```bash
-# Frontend type-check picks up the new TargetId
 pnpm --filter @asicify/web typecheck
-
-# Playground dropdown should show "My Target"
 pnpm --filter @asicify/web dev
-
-# API returns it
-curl http://localhost:8000/api/targets | jq '.[] | select(.id == "my_target")'
-
-# Worker can estimate against it
+# /playground dropdown should show "TSMC 5nm"
+curl http://localhost:8000/api/targets | jq '.[] | select(.id == "tsmc5")'
 cd apps/worker
-uv run asicify estimate gpt2 --target my_target
+python -m uv run asicify estimate --target tsmc5
 ```
 
-Sources for cell-library numbers: foundry data sheets, ASPLOS / ISSCC
-papers, RDL synthesis runs you've personally done. Cite the source in the
-commit message — future maintainers will need to evaluate whether to update.
+## Add a layer kind
 
-## Add a quantization mode
+Worked example: `nn.Conv2d`.
 
-Goal: support a new precision (e.g. FP4 E2M1) end-to-end.
+### 1. Parser — `apps/worker/worker/pipeline/parse.py`
 
-### 1. Shared types
-
-In `packages/shared/src/types.ts` and `apps/api/app/schemas.py`, extend
-the `Quantization` union with `"fp4"`.
-
-In `apps/worker/worker/types.py`, do the same on the worker dataclass
-typedef.
-
-### 2. UI option
-
-In `apps/web/components/playground/config-panel.tsx`, add to
-`QUANT_OPTIONS`:
-
-```ts
-{ value: "fp4", label: "FP4", bits: "4 bit (E2M1)" }
-```
-
-The grid will accommodate; widen the parent if you exceed 5.
-
-### 3. Estimator constants — both copies
-
-Client (`apps/web/lib/estimator.ts`):
-
-```ts
-const BITS_PER_WEIGHT = { …, fp4: 4 };
-const MUL_AREA_SCALE = { …, fp4: 0.25 };  // small ROM-LUT per multiply
-const QUALITY_PENALTY = { …, fp4: 1.06 };  // empirical
-```
-
-Worker (`apps/worker/worker/estimator/area.py`):
+Add to `_classify_module`:
 
 ```python
-MUL_SCALE: dict[str, float] = {…, "fp4": 0.25}
-BITS_PER_WEIGHT: dict[str, float] = {…, "fp4": 4}
+if isinstance(module, nn.Conv2d):
+    info = LayerInfo(
+        name=name,
+        kind="conv2d",
+        in_features=module.in_channels * module.kernel_size[0] * module.kernel_size[1],
+        out_features=module.out_channels,
+        param_count=module.weight.numel() + (module.bias.numel() if module.bias is not None else 0),
+        metadata={
+            "kernel_size": module.kernel_size,
+            "stride": module.stride,
+            "padding": module.padding,
+            "has_bias": module.bias is not None,
+        },
+    )
+    return "conv2d", info
 ```
 
-And in `apps/worker/worker/pipeline/quantize.py`:
+### 2. Quantizer — `apps/worker/worker/kernels/conv.py` (new)
 
 ```python
-PENALTY = {…, "fp4": 1.06}
+def quantize_conv2d(module):
+    # Reshape to (out_ch, in_ch * kh * kw) for per-output-channel quant.
+    w = module.weight.detach().reshape(module.out_channels, -1)
+    return quantize_linear_int8(w, module.bias)
 ```
 
-### 4. Multiplier strategy — `apps/worker/worker/rtl/generator.py`
+### 3. Pipeline — `apps/worker/worker/pipeline/quantize.py`
 
-Add to `_multiplier_strategy`:
+Add a branch:
 
 ```python
-return {…, "fp4": "fp4_lut"}[quantization]
+elif layer.kind == "conv2d" and layer.name in modules:
+    quantized[layer.name] = quantize_conv2d(modules[layer.name])
 ```
 
-### 5. Verilog template — `linear_layer.v.j2`
+### 4. Template — `apps/worker/worker/rtl/templates/conv2d.v.j2`
 
-Add an `{% elif multiplier == 'fp4_lut' %}` branch in the inner-loop body
-of `linear_layer.v.j2`. The body should reference a per-weight LUT (small
-ROM emitted by the synthesizer from the constant table in `weights.vh`).
+The pattern is similar to `linear_layer.v.j2` but with a sliding-window
+state machine that addresses the input row by row. Reuse the same
+unpack_w + MAC + rescale arithmetic.
 
-### 6. Test
-
-```bash
-cd apps/worker
-uv run asicify compile gpt2 --quantization fp4 --target tsmc28
-unzip -p ./build/gpt2.zip top.v | head -20
-```
-
-Verify the generated Verilog references `fp4_lut`-flavored constants and
-that estimator output looks plausible.
-
-## Add an RTL primitive
-
-Goal: support a new layer kind, e.g. `mamba_block`.
-
-### 1. Layer kind type — `apps/worker/worker/types.py`
-
-Extend `LayerKind`:
+### 5. Generator — `apps/worker/worker/rtl/generator.py`
 
 ```python
-LayerKind = Literal[
-    "linear", "conv2d", "attention", "ffn", "layernorm",
-    "embedding", "mamba_block", "other"
-]
+conv_views = []
+...
+elif layer.kind == "conv2d" and isinstance(q, QuantizedConv):
+    conv_views.append({...})
+...
+for view in conv_views:
+    files[f"modules/{view['module_name']}.v"] = env.get_template("conv2d.v.j2").render(...)
 ```
 
-### 2. Parser — `apps/worker/worker/pipeline/parse.py`
+Update `weights.vh.j2` to include `conv_views`.
 
-When real `torch.fx` parsing is wired, add a classifier branch that
-recognizes Mamba's `selective_scan` operation as `mamba_block`. For now,
-extend `synthesize_transformer` if you want a synthesized graph to include
-Mamba blocks for testing.
+### 6. Reference + test
 
-### 3. Template — `apps/worker/worker/rtl/templates/mamba_block.v.j2`
+Extend `reference.py.j2` to handle conv2d stages. Add
+`tests/test_conv.py` mirroring `test_quantize_multi.py` for
+bit-exactness.
 
-Create the Verilog. Follow the conventions of existing templates:
-- `\`default_nettype none` at top, `wire` at bottom.
-- Standard handshake: `in_valid`, `in_ready`, `in_data`, `out_*`.
-- `\`include "weights/weights.vh"` for hardwired constants.
-- `clk` and `rst_n` always; active-low reset.
+The pattern for any new layer kind: **parser → quantizer → pack →
+template → reference → test**.
 
-### 4. Generator — `apps/worker/worker/rtl/generator.py`
+## Add a HF attention parser
 
-In `render_package`, extend the layer dispatch:
+This is the next-largest piece of work and the recipe today is:
+
+### 1. Detection — `apps/worker/worker/pipeline/parse.py`
+
+Walk the module tree looking for a parent module whose immediate
+children include `q_proj`, `k_proj`, `v_proj`, `o_proj` (or `query`,
+`key`, `value`, `output.dense` in older HF naming). When found, group
+those four into a single `LayerInfo(kind="attention", ...)` and stash
+the four nn.Linear refs in `_modules[name]` as a tuple or named dict.
+
+### 2. Quantizer — `apps/worker/worker/kernels/layers.py`
+
+The `quantize_attention` function is already defined. Wire it into
+`pipeline/quantize.py`:
 
 ```python
-elif layer.kind == "mamba_block":
-    content = env.get_template("mamba_block.v.j2").render(layer=layer, **ctx)
+elif layer.kind == "attention" and layer.name in modules:
+    refs = modules[layer.name]   # dict with q, k, v, o
+    quantized[layer.name] = quantize_attention(
+        refs["q"].weight, refs["k"].weight, refs["v"].weight, refs["o"].weight,
+        refs["q"].bias, ..., embed_dim=..., num_heads=...,
+    )
 ```
 
-### 5. Top-level wiring — `apps/worker/worker/rtl/templates/top.v.j2`
+### 3. Generator — `apps/worker/worker/rtl/generator.py`
 
-The `{% for layer in graph.layers %}` block already handles any layer kind
-that emitted a module; verify the generated `u_<i>` instance compiles. If
-Mamba needs additional ports (e.g. state passed across timesteps), extend
-the top template's layer-instance block.
+Add an `attention_views` list. Render an `attention_block.v.j2`
+template that instantiates four `layer_<sym_q>`, `<sym_k>`, `<sym_v>`,
+`<sym_o>` modules plus the `softmax` submodule plus the `kv_cache`
+submodule, and wires them per the standard attention dataflow.
 
-### 6. Estimator weight
+### 4. Template — `apps/worker/worker/rtl/templates/attention_block.v.j2` (new)
 
-Add Mamba-specific area math if needed. The current estimator treats all
-linear-ish layers identically; if Mamba's selective scan is materially
-different, branch on `layer.kind` in
-`apps/worker/worker/estimator/area.py:_effective_param_count`.
+Structural Verilog that wires the existing four `layer_*` modules
+together. The arithmetic is in those modules; this template just
+manages the streaming dataflow and the KV cache lookup.
 
-### 7. Test the package
+### 5. Test
 
-```bash
-uv run asicify compile some-mamba-model --target ecp5
-unzip -d /tmp/m ./build/some-mamba-model.zip
-cd /tmp/m
-make sim                       # cocotb + Verilator should still pass
-verilator --lint-only top.v modules/*.v
-```
-
-## Add a new pipeline stage
-
-Goal: insert a new stage between, say, sparsity and decomposition (perhaps a
-weight-clustering step).
-
-### 1. Stage module — `apps/worker/worker/pipeline/cluster.py`
-
-```python
-from dataclasses import replace
-from worker.types import CompressionConfig, ModelGraph
-
-def apply_clustering(graph: ModelGraph, config: CompressionConfig) -> ModelGraph:
-    # Pure function: input graph, output new graph.
-    # No I/O, no global state, no Redis. Don't import 'app.*'.
-    ...
-    return replace(graph, metadata={**graph.metadata, "clustered": True})
-```
-
-### 2. Wire into orchestrator — `apps/worker/worker/pipeline/orchestrator.py`
-
-Add the call in `run_compression_job` between sparsity and decomposition:
-
-```python
-graph = await _stage(emit, "clustering", apply_clustering, graph, config)
-```
-
-The `_stage` helper handles the start/complete events automatically.
-
-### 3. Optional: extend `CompressionConfig`
-
-If clustering needs config knobs (number of clusters, etc.), add a new
-field:
-
-- `packages/shared/src/types.ts` — TypeScript `CompressionConfig`
-- `apps/api/app/schemas.py` — Pydantic `CompressionConfig`
-- `apps/worker/worker/types.py` — dataclass `CompressionConfig`
-
-Plus a UI control in `apps/web/components/playground/config-panel.tsx`.
-
-### 4. Test
-
-Stage purity makes this easy:
-
-```python
-def test_apply_clustering_reduces_unique_weights():
-    g = synthesize_transformer("test", 1_000_000)
-    cfg = CompressionConfig(...)
-    out = apply_clustering(g, cfg)
-    assert out.metadata["clustered"]
-```
+Pick a small HF model (`prajjwal1/bert-tiny`), parse, quantize, render,
+and assert the attention blocks turn into single `attention_block_*.v`
+files instead of four separate `layer_*.v`.
 
 ## Add a CLI subcommand
 
-Goal: e.g. `asicify report <project>` to download the PDF report.
-
-### 1. Subparser — `apps/worker/worker/cli.py`
-
 ```python
-report_parser = sub.add_parser("report", help="…")
-report_parser.add_argument("project_id")
-```
+# apps/worker/worker/cli.py
+def cmd_compile(args):
+    """asicify compile <model_id> --quantization int8 --target sky130 --output ./build"""
+    from worker.pipeline.parse import parse_model
+    graph = parse_model({"type": "huggingface", "id": args.model_id})
+    config = CompressionConfig(
+        quantization=args.quantization,
+        sparsity=SparsityConfig(type=args.sparsity, ratio=args.sparsity_ratio),
+        decomposition=DecompositionConfig(type="none"),
+    )
+    graph = apply_sparsity(graph, config)
+    graph = quantize_graph(graph, config)
+    render_to_directory(graph, config, Path(args.output))
+    return 0
 
-### 2. Handler
 
-```python
-elif args.cmd == "report":
-    # Hits the API like a regular client
+def main():
+    parser = argparse.ArgumentParser(prog="asicify")
+    sub = parser.add_subparsers(dest="cmd", required=True)
     ...
+    compile_p = sub.add_parser("compile", help="...")
+    compile_p.add_argument("model_id")
+    compile_p.add_argument("--quantization", default="int8")
+    compile_p.add_argument("--sparsity", default="none")
+    compile_p.add_argument("--sparsity-ratio", type=float, default=0.0)
+    compile_p.add_argument("--target", default="sky130")
+    compile_p.add_argument("--output", default="./build")
+    compile_p.set_defaults(func=cmd_compile)
 ```
-
-The CLI is allowed to call the hosted API; that's different from worker
-pipeline code, which must remain self-contained.
-
-### 3. Wire into the script entry
-
-Already handled via `pyproject.toml`'s `[project.scripts]` block:
-
-```toml
-asicify = "worker.cli:main"
-```
-
-The new subcommand auto-registers via the `argparse` subparser pattern.
 
 ## Add a database table
 
-Goal: e.g. add `comments` for inline notes on projects.
-
-### 1. ORM — `apps/api/app/models.py`
-
 ```python
+# apps/api/app/models.py
 class Comment(Base):
     __tablename__ = "comments"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", …))
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", …))
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 ```
 
-### 2. Migration
-
 ```bash
 cd apps/api
 uv run alembic revision --autogenerate -m "add comments table"
-# Review the generated file in alembic/versions/, then:
+# Review the file in alembic/versions/, then:
 uv run alembic upgrade head
 ```
 
-### 3. Pydantic schemas — `apps/api/app/schemas.py`
-
-```python
-class CommentCreate(BaseModel):
-    body: str
-
-class CommentResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    project_id: UUID
-    user_id: UUID
-    body: str
-    created_at: datetime
-```
-
-### 4. Router — `apps/api/app/routers/comments.py`
-
-Mirror the pattern in `routers/projects.py`. Add to `app/main.py`:
-
-```python
-app.include_router(comments.router, prefix="/api/projects", tags=["comments"])
-```
-
-### 5. Optional: shared TS types
-
-If the frontend will display comments, add to `packages/shared/src/types.ts`
-and update `apps/web/lib/api.ts` with new methods.
+Add the matching Pydantic schemas in `app/schemas.py`, the router in
+`app/routers/comments.py`, and mount it in `app/main.py`.
 
 ## Add a model to the catalog
 
-Goal: support a new HuggingFace model id in the dropdown.
+Two files, both manual today (a future codegen step would derive one
+from the other):
 
-You must update **both** copies:
+1. **`apps/api/app/data/catalog.py`** — append a `CatalogModel(...)`.
+2. **`apps/web/lib/catalog.ts`** — append a matching object to
+   `MODEL_CATALOG`.
 
-1. `apps/api/app/data/catalog.py` — `CATALOG` list
-2. `apps/web/lib/catalog.ts` — `MODEL_CATALOG` array
-
-Required fields: `id`, `hf_id`, `display_name`, `family`, `task`,
-`parameters`, `recommended_compression`. The recommended compression
-should be a config that's known to validate well — start with INT8 +
-no sparsity if you haven't tested aggressive settings.
-
-If the model has unusual structure (Mamba, MoE, encoder-decoder), add a
-note in `metadata` and consider whether the parser needs a new branch.
+Both must have the same `id`, `hf_id`, `display_name`, `family`,
+`task`, `parameters`, and `recommended_compression`. If they drift, the
+playground shows one model and the API serves another. We don't have
+codegen here yet because the catalog is small (under 30 models).
 
 ## Anti-patterns to avoid
 
-These are mistakes I've watched people make. Don't do them.
+These break things; don't do them.
 
 ### Cross-package Python imports
 
@@ -397,48 +425,36 @@ These are mistakes I've watched people make. Don't do them.
 from app.models import Project   # NO — that's apps/api
 ```
 
-The worker is supposed to run standalone via the CLI. If it depends on
-`apps/api`, that breaks.
+The worker is supposed to run standalone. If it depends on `apps/api`,
+the CLI and the open-source story break.
 
-### Bypassing the orchestrator
+### Diverging the kernel forward and the reference template
+
+The bit-exactness contract holds *only* if `linear_int8_forward` and
+`reference.py.j2` implement the same arithmetic. If you change one,
+change the other in the same commit and run
+`tests/test_quantize_multi.py`.
+
+### Bypassing the orchestrator's `_stage` helper
 
 ```python
-# Worker pipeline code calling the emit function directly
+# Worker pipeline code
 await emit({"event": "log", "message": "doing stuff"})  # NO
 ```
 
-Use `_stage(emit, name, fn, *args)`. The orchestrator owns the event
-shapes; ad-hoc emits will break consumers.
+Use `_stage(emit, name, fn, *args)`. The helper owns the event shapes
+that the WebSocket consumers depend on; ad-hoc emits will break the UI.
 
-### Global mutable state in stages
+### Hardcoding the model catalog or target list in two places without syncing
 
-```python
-# In pipeline/quantize.py
-QUANT_CACHE = {}  # NO
+The web `catalog.ts` and api `catalog.py` (and similarly the targets
+list across web/api/worker) must stay aligned. Use the existing
+"change all three in the same PR" discipline until codegen is wired.
 
-def quantize_graph(graph, config):
-    if (graph.name, config) in QUANT_CACHE: ...  # NO
-```
+### Touching `weights.vh` without updating the reference
 
-Caching belongs in the orchestrator, keyed by content hash. Stage purity
-is what makes the system testable.
-
-### Hardcoding the API base URL
-
-```ts
-fetch("https://api.asicify.com/api/projects")  // NO
-```
-
-Use `lib/api.ts` which respects `NEXT_PUBLIC_API_BASE_URL`. Hardcoded URLs
-break local dev.
-
-### Shipping the worker estimator constants to the client
-
-Don't generate `apps/web/lib/estimator.ts`'s constants from
-`apps/worker/...` at runtime. The client must remain a static bundle.
-
-### Touching `weights.vh` without updating the multiplier branch
-
-If you add a precision, you also add a Verilog branch. If you only change
-the data layout in `weights.vh`, the existing multiplier branches break
-silently. Always test with `verilator --lint-only` after changes.
+If you change how a precision packs its weights, the kernel forward
+keeps working (it reads the canonical signed form), but the generated
+`reference.py` reads from the same JSON the pack module emits. Make
+sure the `weights_json` in `generator.py:_build_weights_json` matches
+what the templates actually produce.
