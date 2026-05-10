@@ -1,5 +1,11 @@
 import Link from "next/link";
 
+interface FooterLink {
+  href: string;
+  label: string;
+  external?: boolean;
+}
+
 export function Footer() {
   return (
     <footer className="border-t border-[var(--color-border-subtle)] mt-24">
@@ -9,37 +15,39 @@ export function Footer() {
             ASIC<span className="text-[var(--color-accent)]">|</span>fy
           </div>
           <p className="text-sm text-[var(--color-text-secondary)] max-w-xs">
-            The compiler for AI silicon. Open-source core. MIT licensed.
+            An open-source compiler for AI silicon. MIT licensed.
           </p>
         </div>
         <FooterCol
-          title="Product"
+          title="Project"
           links={[
             { href: "/playground", label: "Playground" },
-            { href: "/pricing", label: "Pricing" },
             { href: "/docs", label: "Documentation" },
+            { href: "/about", label: "About" },
           ]}
         />
         <FooterCol
-          title="Resources"
+          title="Read"
           links={[
-            { href: "/docs/methodology", label: "Methodology" },
             { href: "/docs/architecture", label: "Architecture" },
-            { href: "/blog", label: "Blog" },
+            { href: "/docs/methodology", label: "Methodology" },
+            { href: "/docs/codebase", label: "Codebase tour" },
+            { href: "/docs/roadmap", label: "Roadmap" },
           ]}
         />
         <FooterCol
-          title="Community"
+          title="Contribute"
           links={[
-            { href: "https://github.com/asicify/asicify", label: "GitHub" },
-            { href: "https://discord.gg/asicify", label: "Discord" },
-            { href: "mailto:hello@asicify.com", label: "Contact" },
+            { href: "https://github.com/asicify/asicify", label: "GitHub", external: true },
+            { href: "https://github.com/asicify/asicify/issues", label: "Issues", external: true },
+            { href: "https://github.com/asicify/asicify/discussions", label: "Discussions", external: true },
+            { href: "/docs/internals/extending", label: "Extending" },
           ]}
         />
       </div>
       <div className="border-t border-[var(--color-border-subtle)]">
         <div className="mx-auto max-w-[1200px] px-6 py-4 flex justify-between text-xs text-[var(--color-text-tertiary)]">
-          <span>© 2026 ASICify. MIT licensed.</span>
+          <span>MIT licensed. Free to use, fork, and modify.</span>
           <span className="font-mono">v0.1.0</span>
         </div>
       </div>
@@ -52,7 +60,7 @@ function FooterCol({
   links,
 }: {
   title: string;
-  links: { href: string; label: string }[];
+  links: FooterLink[];
 }) {
   return (
     <div>
@@ -60,16 +68,29 @@ function FooterCol({
         {title}
       </div>
       <ul className="flex flex-col gap-2">
-        {links.map((l) => (
-          <li key={l.href}>
-            <Link
-              href={l.href}
-              className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              {l.label}
-            </Link>
-          </li>
-        ))}
+        {links.map((l) =>
+          l.external ? (
+            <li key={l.href}>
+              <a
+                href={l.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              >
+                {l.label}
+              </a>
+            </li>
+          ) : (
+            <li key={l.href}>
+              <Link
+                href={l.href}
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              >
+                {l.label}
+              </Link>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   );

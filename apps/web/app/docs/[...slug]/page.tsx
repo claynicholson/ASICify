@@ -22,9 +22,9 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const doc = await getDoc(slug.join("/"));
-  if (!doc) return { title: "Not found — ASICify" };
+  if (!doc) return { title: "Not found · ASICify" };
   return {
-    title: `${doc.label} — ASICify Docs`,
+    title: `${doc.label} · ASICify Docs`,
   };
 }
 

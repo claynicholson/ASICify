@@ -4,20 +4,20 @@ export function CodeSnippet() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
         <div>
           <div className="text-[11px] uppercase tracking-[0.08em] text-[var(--color-text-tertiary)] font-medium mb-3">
-            CLI usage
+            CLI
           </div>
           <h2 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1] mb-4">
-            Scriptable end-to-end.
+            Same compiler, scriptable.
           </h2>
           <p className="text-[var(--color-text-secondary)] leading-relaxed mb-6">
-            The web playground is for exploration. Production pipelines use the
-            CLI or REST API. Same compiler underneath.
+            The web playground is for exploration. Production pipelines use
+            the CLI or REST API. Same compiler underneath.
           </p>
           <ul className="space-y-3 text-sm">
             <li className="flex gap-3">
               <span className="text-[var(--color-success)] mt-1">▸</span>
               <span className="text-[var(--color-text-secondary)]">
-                Reproducible builds — every artifact pinned to config hash
+                Reproducible: every artifact pinned to a config hash
               </span>
             </li>
             <li className="flex gap-3">
@@ -54,7 +54,7 @@ export function CodeSnippet() {
     --target tsmc28,ecp5
 
 `}<span className="text-[var(--color-success)]">{`✓`}</span>{` Parsed model graph (124M params, 12 layers)
-`}<span className="text-[var(--color-success)]">{`✓`}</span>{` Quantized to INT4   `}<span className="text-[var(--color-text-tertiary)]">{`(perplexity 24.3 → 25.1)`}</span>{`
+`}<span className="text-[var(--color-success)]">{`✓`}</span>{` Quantized to INT4   `}<span className="text-[var(--color-text-tertiary)]">{`(perplexity 24.3 to 25.1)`}</span>{`
 `}<span className="text-[var(--color-success)]">{`✓`}</span>{` Applied 2:4 sparsity `}<span className="text-[var(--color-text-tertiary)]">{`(50% zeros)`}</span>{`
 `}<span className="text-[var(--color-success)]">{`✓`}</span>{` Generated RTL       `}<span className="text-[var(--color-text-tertiary)]">{`(top.v + 47 modules)`}</span>{`
 `}<span className="text-[var(--color-success)]">{`✓`}</span>{` Estimated `}<span className="text-[var(--color-accent)]">{`tsmc28`}</span>{`     `}<span className="text-[var(--color-text-tertiary)]">{`(8.2 mm², $4.10 @ 100K)`}</span>{`

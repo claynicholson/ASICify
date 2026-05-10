@@ -29,7 +29,7 @@ export function InferenceComparison({
   return (
     <div className="rounded-[6px] border border-[var(--color-border-subtle)] bg-[var(--color-bg-overlay)] p-4">
       <div className="text-[11px] uppercase tracking-[0.08em] text-[var(--color-text-tertiary)] font-medium mb-3">
-        Sample inference (preview — runs locally on full project)
+        Sample inference (preview)
       </div>
       <div className="font-mono text-xs space-y-3">
         <div>

@@ -2,21 +2,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASICify — The compiler for AI silicon",
+  title: "ASICify · Compiler for AI silicon",
   description:
-    "ASICify compiles trained PyTorch models into hardware-ready specifications. Synthesizable Verilog, area estimates across foundry nodes, FPGA reference implementations.",
-  metadataBase: new URL("https://asicify.com"),
+    "Open-source compiler that turns trained PyTorch models into synthesizable Verilog, with area and cost estimates across eleven hardware targets.",
   openGraph: {
     title: "ASICify",
-    description: "From PyTorch to silicon in minutes.",
-    url: "https://asicify.com",
+    description: "Open-source compiler. PyTorch to synthesizable Verilog.",
     siteName: "ASICify",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "ASICify",
-    description: "From PyTorch to silicon in minutes.",
+    description: "Open-source compiler. PyTorch to synthesizable Verilog.",
   },
 };
 

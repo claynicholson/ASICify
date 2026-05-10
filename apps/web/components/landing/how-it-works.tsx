@@ -3,21 +3,21 @@ import { FileCode, Cpu, Wrench } from "lucide-react";
 const STEPS = [
   {
     icon: FileCode,
-    title: "Upload your model",
+    title: "Pick a model",
     description:
-      "PyTorch checkpoint, HuggingFace ID, or one of our 30 curated models. We parse the compute graph in seconds.",
+      "PyTorch checkpoint, HuggingFace ID, or one of the curated catalog. ASICify parses the compute graph in seconds.",
   },
   {
     icon: Wrench,
-    title: "We compress and analyze",
+    title: "Compress and validate",
     description:
-      "Quantization, structured sparsity, Monarch decomposition, optional hardware-aware fine-tuning. Quality validated on a held-out benchmark.",
+      "Quantization, structured sparsity, Monarch decomposition, optional hardware-aware fine-tuning. Quality is checked on a held-out benchmark.",
   },
   {
     icon: Cpu,
-    title: "Download RTL + reports",
+    title: "Get the RTL",
     description:
-      "Synthesizable Verilog with hardwired weights, cocotb testbench, area/cost/throughput estimates across every target you selected.",
+      "Synthesizable Verilog with hardwired weights, Cocotb testbench, area and cost estimates across every target you selected.",
   },
 ];
 
@@ -29,7 +29,7 @@ export function HowItWorks() {
           How it works
         </div>
         <h2 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-          Three steps from checkpoint to chip.
+          From checkpoint to silicon in three steps.
         </h2>
       </div>
 

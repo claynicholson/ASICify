@@ -2,8 +2,8 @@ import Link from "next/link";
 import { DOC_SECTIONS, getLastUpdated, formatRelative } from "@/lib/docs";
 
 export const metadata = {
-  title: "Documentation — ASICify",
-  description: "Compile PyTorch models into hardware-ready specifications.",
+  title: "Documentation · ASICify",
+  description: "Compile PyTorch models to hardware-ready specifications.",
 };
 
 export default async function DocsIndexPage() {
@@ -86,12 +86,22 @@ export default async function DocsIndexPage() {
           </li>
           <li>
             <a
-              href="https://discord.gg/asicify"
+              href="https://github.com/asicify/asicify/issues"
               target="_blank"
               rel="noreferrer"
               className="hover:text-[var(--color-accent)]"
             >
-              → Discord community
+              → File an issue
+            </a>
+          </li>
+          <li>
+            <a
+              href="https://github.com/asicify/asicify/discussions"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-[var(--color-accent)]"
+            >
+              → GitHub Discussions
             </a>
           </li>
         </ul>

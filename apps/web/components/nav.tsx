@@ -19,25 +19,16 @@ export function Nav() {
             <Link href="/docs">Docs</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/blog">Blog</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/pricing">Pricing</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
             <Link href="/about">About</Link>
           </Button>
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="secondary" size="sm">
             <a
               href="https://github.com/asicify/asicify"
               target="_blank"
               rel="noreferrer"
             >
-              GitHub
+              GitHub →
             </a>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/sign-in">Sign in</Link>
           </Button>
         </nav>
       </div>

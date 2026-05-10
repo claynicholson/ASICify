@@ -115,10 +115,10 @@ export function quickEstimate(input: QuickEstimateInput): QuickEstimate {
 
   // Storage area (mask ROM)
   const storage_um2 = eff * bpw * params.rom_bit_um2;
-  // Compute area (multipliers; crude — assume 1 multiplier per output channel batched)
+  // Compute area (multipliers). Crude: assume 1 multiplier per output channel batched.
   const mul_count = Math.min(eff, 4096);
   const compute_um2 = mul_count * params.mul_int8_um2 * MUL_AREA_SCALE[config.quantization];
-  // SRAM (KV cache, activations) — estimate 4MB ceiling
+  // SRAM (KV cache, activations). Estimate at a 4 MB ceiling.
   const sram_um2 = 4 * 1024 * 1024 * 8 * params.sram_bit_um2 * 0.05;
   // I/O ring (fixed-ish)
   const io_um2 = 0.5 * 1_000_000;

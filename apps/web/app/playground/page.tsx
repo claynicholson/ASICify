@@ -11,7 +11,6 @@ import { ParetoPlot } from "@/components/playground/pareto-plot";
 import { InferenceComparison } from "@/components/playground/inference-comparison";
 import { MODEL_CATALOG, opsPerInference } from "@/lib/catalog";
 import { quickEstimate } from "@/lib/estimator";
-import { Button } from "@/components/ui/button";
 
 const DEFAULT_CONFIG: CompressionConfig = {
   quantization: "int4",
@@ -66,37 +65,18 @@ export default function PlaygroundPage() {
     );
   }, [model, config]);
 
-  const onCompile = () => {
-    // In production, hits POST /api/projects then routes to /projects/[id].
-    // Stub for the playground demo.
-    alert(
-      "Compilation queued. Sign in to save the project and download the RTL package.",
-    );
-  };
-
   return (
     <>
       <Nav />
       <main className="mx-auto max-w-[1440px] px-6 py-8">
-        <div className="mb-8 flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight-display">
-              Playground
-            </h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Live estimates as you tune compression. Cached numbers update in
-              real time — full compile generates real RTL.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              Save as project
-            </Button>
-            <Button variant="outline" size="sm">
-              Share
-            </Button>
-            <Button size="sm">Download RTL</Button>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight-display">
+            Playground
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Live estimates as you tune compression. All math runs in your
+            browser. No signup, no backend.
+          </p>
         </div>
 
         <div className="grid grid-cols-12 gap-6">
@@ -110,7 +90,6 @@ export default function PlaygroundPage() {
                 setConfig={setConfig}
                 target={target}
                 setTarget={setTarget}
-                onCompile={onCompile}
               />
             </div>
           </aside>

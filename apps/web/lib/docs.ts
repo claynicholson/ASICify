@@ -130,7 +130,7 @@ export async function getLastUpdated(slug: string): Promise<Date | null> {
   return null;
 }
 
-/** "2 hours ago", "yesterday", "Mar 12" etc. — for index display. */
+/** Format like "2h ago", "3d ago", or "Mar 12" for index display. */
 export function formatRelative(d: Date): string {
   const diffMs = Date.now() - d.getTime();
   const min = Math.floor(diffMs / 60_000);

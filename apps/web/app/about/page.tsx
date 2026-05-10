@@ -3,8 +3,8 @@ import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
 
 export const metadata = {
-  title: "About — ASICify",
-  description: "The compiler for AI silicon — vision, mission, and contact.",
+  title: "About · ASICify",
+  description: "An open-source compiler for AI silicon.",
 };
 
 export default function AboutPage() {
@@ -16,54 +16,54 @@ export default function AboutPage() {
           About
         </div>
         <h1 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-          The horizontal layer underneath every AI chip company.
+          About this project
         </h1>
 
         <div className="mt-8 space-y-6 text-[var(--color-text-secondary)] leading-relaxed">
           <p>
-            Custom AI silicon costs $5–30M per tape-out and takes 6–18 months.
-            The bottleneck isn't fabrication — it's the model-to-hardware
-            translation. Every chip company and edge-AI deployer currently does
-            that translation by hand, with expensive specialist engineers.
+            ASICify is an open-source compiler that turns trained neural
+            networks into hardware-ready specifications. Submit a model and
+            get back compressed weights, synthesizable RTL with hardwired
+            multipliers, area estimates across foundry nodes, an FPGA
+            reference implementation, and a verified Cocotb testbench.
           </p>
           <p>
-            ASICify is an automated compiler for that translation. Upload a
-            model, get back: aggressively compressed weights, synthesizable RTL
-            with hardwired multipliers, area estimates across foundry nodes, an
-            FPGA reference implementation, and a verified testbench. We work
-            with you to deploy on TinyTapeout, chipIgnite, FPGA-as-a-Service,
-            or commercial fabs.
+            Custom AI silicon costs $5 to 30 million per tape-out and takes
+            6 to 18 months. Fabrication isn&apos;t the bottleneck. The
+            model-to-hardware translation is. Most chip companies and edge-AI
+            deployers do that translation by hand today, with specialist
+            engineers writing the same boilerplate over and over.
           </p>
           <p>
-            Cadence and Synopsys built EDA for general-purpose chips. We're
-            building it for one thing: turning a trained network into a
-            fixed-function inference accelerator.
+            ASICify automates the boilerplate so people can focus on
+            cell-level and process-level engineering. Cadence and Synopsys
+            built EDA for general-purpose chips. ASICify targets one
+            workflow: turning a trained inference network into a
+            fixed-function accelerator.
           </p>
         </div>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card label="Open source" body="MIT-licensed core. The compression pipeline and RTL generator are on GitHub." />
-          <Card label="Hardware targets" body="11 supported: SkyWater 130, GF22FDX, TSMC 28/16/7, Lattice, Xilinx, shuttles." />
-          <Card label="Time to first RTL" body="Under 10 minutes from checkpoint to a synthesizable Verilog package." />
+          <Card label="License" body="MIT. Free to use, fork, modify, and ship in commercial products." />
+          <Card label="Hardware targets" body="Eleven supported, from SkyWater 130 to TSMC 7nm to Lattice and Xilinx FPGAs." />
+          <Card label="Status" body="Pre-1.0. The MVP spine is complete; real model parsing and validation are next." />
         </div>
 
         <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
-          <h2 className="text-xl font-semibold tracking-tight-display mb-4">Get in touch</h2>
+          <h2 className="text-xl font-semibold tracking-tight-display mb-4">
+            Get involved
+          </h2>
+          <p className="text-[var(--color-text-secondary)] leading-relaxed mb-6">
+            ASICify is community-built. The high-leverage areas right now:
+            adding hardware targets with cell-library citations, new
+            quantization formats (FP4, FP8, MXFP), new layer kinds (Mamba,
+            MoE), and refining cost-model parameters with foundry data
+            sheets.
+          </p>
           <ul className="space-y-2 text-sm">
-            <li>
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mr-3">
-                Email
-              </span>
-              <a
-                href="mailto:hello@asicify.com"
-                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
-              >
-                hello@asicify.com
-              </a>
-            </li>
-            <li>
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mr-3">
-                GitHub
+            <li className="flex gap-3">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+                Source
               </span>
               <a
                 href="https://github.com/asicify/asicify"
@@ -74,18 +74,42 @@ export default function AboutPage() {
                 github.com/asicify/asicify
               </a>
             </li>
-            <li>
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mr-3">
-                Discord
+            <li className="flex gap-3">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+                Issues
               </span>
               <a
-                href="https://discord.gg/asicify"
+                href="https://github.com/asicify/asicify/issues"
                 target="_blank"
                 rel="noreferrer"
                 className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
               >
-                discord.gg/asicify
+                Bug reports and feature requests
               </a>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+                Discuss
+              </span>
+              <a
+                href="https://github.com/asicify/asicify/discussions"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+              >
+                GitHub Discussions for design questions
+              </a>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+                Extend
+              </span>
+              <Link
+                href="/docs/internals/extending"
+                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+              >
+                Recipes for adding targets, primitives, and stages
+              </Link>
             </li>
           </ul>
 
@@ -94,7 +118,7 @@ export default function AboutPage() {
               href="/playground"
               className="inline-flex items-center justify-center h-9 px-4 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] text-sm font-medium hover:brightness-110"
             >
-              Try the demo
+              Open the playground
             </Link>
             <Link
               href="/docs"
@@ -103,6 +127,20 @@ export default function AboutPage() {
               Read the docs
             </Link>
           </div>
+        </div>
+
+        <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
+          <h2 className="text-xl font-semibold tracking-tight-display mb-4">
+            Acknowledgements
+          </h2>
+          <p className="text-[var(--color-text-secondary)] leading-relaxed text-sm">
+            ASICify stands on a lot of open-source work. Tri Dao and the
+            HazyResearch team for Monarch matrices. Matt Venn for
+            TinyTapeout. SkyWater and Efabless for the open-PDK movement.
+            The Yosys and nextpnr maintainers for the open synthesis flow.
+            The Cocotb authors for making hardware verification feel like
+            Python.
+          </p>
         </div>
       </main>
       <Footer />

@@ -3,21 +3,21 @@ import { Layers, GitBranch, CircuitBoard } from "lucide-react";
 const ITEMS = [
   {
     icon: Layers,
-    title: "Multi-target backend",
+    title: "Eleven hardware targets",
     description:
-      "One tool, every target. SkyWater, GF22FDX, TSMC 28/16/7nm, Lattice ECP5/CrossLink-NX, Xilinx Artix-7/Kria, TinyTapeout, chipIgnite — all from the same source model.",
+      "SkyWater 130, GF22FDX, TSMC 28/16/7nm, Lattice ECP5, Lattice CrossLink-NX, Xilinx Artix-7, Xilinx Kria, TinyTapeout, chipIgnite. One source model emits all of them.",
   },
   {
     icon: GitBranch,
-    title: "Open-source core",
+    title: "Fully open source",
     description:
-      "MIT licensed. The compression pipeline and RTL generator are on GitHub. No NDAs, no per-tape-out fees. The hosted version layers convenience and compute.",
+      "MIT licensed. The full compiler, RTL generator, and cost models live on GitHub. No NDAs, no per-tape-out fees, no proprietary core.",
   },
   {
     icon: CircuitBoard,
-    title: "Hardware-software co-design",
+    title: "Hardware-aware compression",
     description:
-      "Sub-1-bit effective representation. Monarch matrix decomposition built into synthesis. Hardware-aware fine-tuning. Optimize the model for the silicon.",
+      "Sub-1-bit effective bits per weight via ternary plus sparsity plus decomposition. Monarch matrix factorization built into synthesis. Hardware-aware fine-tuning.",
   },
 ];
 
@@ -29,12 +29,12 @@ export function Differentiators() {
           Why ASICify
         </div>
         <h2 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-          Built for the AI silicon era.
+          A compiler, not a chip company.
         </h2>
         <p className="mt-4 text-[var(--color-text-secondary)] leading-relaxed">
-          Cadence and Synopsys built EDA for general-purpose chips. ASICify is
-          built for one thing: turning a trained network into a fixed-function
-          inference accelerator.
+          Cadence and Synopsys built EDA for general-purpose chips. ASICify
+          targets one workflow: turning a trained inference network into a
+          fixed-function accelerator.
         </p>
       </div>
 

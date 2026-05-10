@@ -24,7 +24,6 @@ interface Props {
   setConfig: (c: CompressionConfig) => void;
   target: TargetId;
   setTarget: (t: TargetId) => void;
-  onCompile: () => void;
 }
 
 export function ConfigPanel({
@@ -34,7 +33,6 @@ export function ConfigPanel({
   setConfig,
   target,
   setTarget,
-  onCompile,
 }: Props) {
   return (
     <div className="flex flex-col gap-6">
@@ -159,12 +157,16 @@ export function ConfigPanel({
         </p>
       </div>
 
-      <button
-        onClick={onCompile}
-        className="h-11 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] font-semibold text-sm hover:brightness-110 transition-[filter]"
+      <a
+        href="/docs/quickstart"
+        className="h-11 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] font-semibold text-sm hover:brightness-110 transition-[filter] flex items-center justify-center"
       >
-        Compile to RTL
-      </button>
+        Compile via CLI →
+      </a>
+      <p className="text-[11px] text-[var(--color-text-tertiary)] -mt-3 leading-relaxed">
+        Estimates above run in your browser. To generate real RTL, run the
+        CLI. The quickstart has the command.
+      </p>
     </div>
   );
 }

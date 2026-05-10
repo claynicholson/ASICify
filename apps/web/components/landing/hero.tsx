@@ -9,24 +9,24 @@ export function Hero() {
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)] px-3 py-1 mb-8">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse" />
           <span className="text-xs text-[var(--color-text-secondary)]">
-            v0.1 — open-source core on GitHub
+            v0.1 · open source on GitHub
           </span>
         </div>
 
         <h1 className="text-[clamp(2.5rem,6vw,3.5rem)] font-bold tracking-display leading-[1.05] max-w-3xl">
-          From PyTorch to silicon{" "}
-          <span className="text-[var(--color-accent)]">in minutes.</span>
+          Compile PyTorch models to{" "}
+          <span className="text-[var(--color-accent)]">synthesizable Verilog.</span>
         </h1>
 
         <p className="mt-6 max-w-2xl text-[18px] text-[var(--color-text-secondary)] leading-relaxed">
-          ASICify compiles trained models into hardware-ready specifications.
-          Synthesizable Verilog, area estimates across foundry nodes, FPGA
-          reference implementations — all from a model checkpoint.
+          Generates RTL with hardwired weights, area and cost estimates across
+          eleven hardware targets, and a Cocotb testbench. Drag a slider in the
+          playground to see what your model looks like as silicon.
         </p>
 
         <div className="mt-8 flex items-center gap-3">
           <Button asChild size="lg">
-            <Link href="/playground">Try the demo →</Link>
+            <Link href="/playground">Open the playground</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
             <a
@@ -34,16 +34,16 @@ export function Hero() {
               target="_blank"
               rel="noreferrer"
             >
-              View on GitHub
+              Source on GitHub
             </a>
           </Button>
         </div>
 
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl">
-          <Stat label="Models supported" value="30+" />
           <Stat label="Hardware targets" value="11" />
-          <Stat label="Compression ratio" value="40×" />
-          <Stat label="Time to first RTL" value="< 10 min" />
+          <Stat label="Foundry nodes" value="5" />
+          <Stat label="Quantization modes" value="5" />
+          <Stat label="License" value="MIT" />
         </div>
       </div>
     </section>

@@ -5,50 +5,50 @@ import { cn } from "@/lib/utils";
 const PERSONAS = [
   {
     id: "ml-systems",
-    label: "I'm exploring custom silicon",
-    headline: "30-page hardware feasibility report from a checkpoint in 10 minutes.",
+    label: "Exploring custom silicon",
+    headline: "Hardware feasibility report from a checkpoint.",
     description:
-      "You have a model that runs on GPUs but is too expensive at scale. Leadership wants a credible cost / feasibility analysis. ASICify produces it: target comparison, BOM at volume, throughput projections — defensible numbers your CFO can actually use.",
+      "You have a model that runs on GPUs but is too expensive at scale. Leadership wants a credible cost analysis. ASICify produces target comparisons, BOM at volume, and throughput projections you can defend in a CFO meeting.",
     bullets: [
-      "Cost per chip at 1K / 100K / 1M volume tiers",
-      "Throughput per area across 11 hardware targets",
-      "Apples-to-apples comparison vs. continued GPU spend",
+      "Cost per chip at 1K, 100K, and 1M volume tiers",
+      "Throughput per area across eleven hardware targets",
+      "Direct comparison vs. continued GPU spend",
     ],
   },
   {
     id: "asic-designer",
-    label: "I'm an ASIC designer",
-    headline: "Skip the bottom 60% of your stack.",
+    label: "ASIC designer at a chip startup",
+    headline: "Stop hand-writing the boilerplate.",
     description:
-      "You currently hand-write quantization, sparsity, and RTL templates for every model. That's not where your differentiation is. Use ASICify for the boilerplate so you can focus on cell-level and process-level work.",
+      "You currently hand-write quantization, sparsity, and RTL templates for every model. That isn't where your differentiation is. Use ASICify for the repetitive work and focus on cell-level and process-level engineering.",
     bullets: [
       "Synthesizable Verilog with hardwired multipliers",
-      "Cocotb testbench + bit-exact Python reference",
-      "Open templates — extend with your own primitives",
+      "Cocotb testbench plus bit-exact Python reference",
+      "Open templates you can extend with your own primitives",
     ],
   },
   {
     id: "researcher",
-    label: "I'm a researcher",
+    label: "Research and academia",
     headline: "Real silicon estimates for your methodology section.",
     description:
-      "You publish on efficient inference but reviewers ask 'what would this cost in actual hardware?' ASICify is the free, open-source tool you cite — with confidence intervals derived from published cell library data.",
+      "You publish on efficient inference. Reviewers ask what your method would cost in actual hardware. ASICify is the free, open-source tool you can cite, with confidence intervals derived from published cell library data.",
     bullets: [
-      "Reproducible: every estimate pinned to a config hash",
+      "Reproducible estimates pinned to a config hash",
       "MIT-licensed core, no commercial EDA dependency",
-      "Citeable: published cost models documented in /docs/methodology",
+      "Cost models documented in /docs/methodology",
     ],
   },
   {
     id: "edge-deployer",
-    label: "I'm deploying on FPGAs",
-    headline: "Lattice and Xilinx, ready to flash.",
+    label: "Edge AI deployment",
+    headline: "FPGA bitstreams, ready to flash.",
     description:
-      "You're shipping IoT, automotive, or robotics products. ASICify generates the FPGA RTL today and gives you the path to ASIC if your volumes justify it.",
+      "You ship IoT, automotive, or robotics products. ASICify generates the FPGA RTL today and gives you a path to ASIC if your volumes justify it.",
     bullets: [
-      "ECP5 + nextpnr toolchain (open source)",
+      "ECP5 plus nextpnr toolchain (open source)",
       "Vivado scripts for Artix-7 and Kria",
-      "Same source model as the eventual ASIC tape-out",
+      "Same source model when you migrate to ASIC",
     ],
   },
 ];
@@ -64,7 +64,7 @@ export function UseCases() {
           Use cases
         </div>
         <h2 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-          Built for the people who actually ship silicon.
+          Four common workflows.
         </h2>
       </div>
 
