@@ -23,7 +23,7 @@ export function Nav() {
           </Button>
           <Button asChild variant="secondary" size="sm">
             <a
-              href="https://github.com/asicify/asicify"
+              href="https://github.com/claynicholson/asicify"
               target="_blank"
               rel="noreferrer"
             >

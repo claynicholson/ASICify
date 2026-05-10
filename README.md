@@ -149,7 +149,7 @@ asicify/
 No databases, no Python, no GPU. The live estimator runs in your browser.
 
 ```bash
-git clone https://github.com/asicify/asicify
+git clone https://github.com/claynicholson/asicify
 cd asicify
 pnpm install
 pnpm --filter @asicify/web dev

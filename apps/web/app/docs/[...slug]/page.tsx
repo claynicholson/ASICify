@@ -76,7 +76,7 @@ export default async function DocPage({ params }: PageProps) {
           Last updated {formatRelative(doc.lastUpdated)} · {doc.sourcePath}
         </span>
         <a
-          href={`https://github.com/asicify/asicify/edit/main/${doc.sourcePath}`}
+          href={`https://github.com/claynicholson/asicify/edit/main/${doc.sourcePath}`}
           target="_blank"
           rel="noreferrer"
           className="hover:text-[var(--color-text-secondary)]"
@@ -135,7 +135,7 @@ function rewriteHref(href: string | undefined): string | undefined {
 
   // External-to-docs source files (apps/web/lib/foo.ts) → GitHub link
   if (h.startsWith("apps/") || h.startsWith("packages/") || h.startsWith("infra/")) {
-    return `https://github.com/asicify/asicify/blob/main/${h}`;
+    return `https://github.com/claynicholson/asicify/blob/main/${h}`;
   }
 
   // Anything else under the repo root we don't recognize → leave alone

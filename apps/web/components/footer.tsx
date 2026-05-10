@@ -38,9 +38,9 @@ export function Footer() {
         <FooterCol
           title="Contribute"
           links={[
-            { href: "https://github.com/asicify/asicify", label: "GitHub", external: true },
-            { href: "https://github.com/asicify/asicify/issues", label: "Issues", external: true },
-            { href: "https://github.com/asicify/asicify/discussions", label: "Discussions", external: true },
+            { href: "https://github.com/claynicholson/asicify", label: "GitHub", external: true },
+            { href: "https://github.com/claynicholson/asicify/issues", label: "Issues", external: true },
+            { href: "https://github.com/claynicholson/asicify/discussions", label: "Discussions", external: true },
             { href: "/docs/internals/extending", label: "Extending" },
           ]}
         />

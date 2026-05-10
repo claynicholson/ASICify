@@ -71,7 +71,7 @@ export default async function DocsIndexPage() {
         <ul className="space-y-2 text-sm text-[var(--color-text-secondary)]">
           <li>
             <a
-              href="https://github.com/asicify/asicify"
+              href="https://github.com/claynicholson/asicify"
               target="_blank"
               rel="noreferrer"
               className="hover:text-[var(--color-accent)]"
@@ -86,7 +86,7 @@ export default async function DocsIndexPage() {
           </li>
           <li>
             <a
-              href="https://github.com/asicify/asicify/issues"
+              href="https://github.com/claynicholson/asicify/issues"
               target="_blank"
               rel="noreferrer"
               className="hover:text-[var(--color-accent)]"
@@ -96,7 +96,7 @@ export default async function DocsIndexPage() {
           </li>
           <li>
             <a
-              href="https://github.com/asicify/asicify/discussions"
+              href="https://github.com/claynicholson/asicify/discussions"
               target="_blank"
               rel="noreferrer"
               className="hover:text-[var(--color-accent)]"

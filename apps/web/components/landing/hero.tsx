@@ -30,7 +30,7 @@ export function Hero() {
           </Button>
           <Button asChild variant="outline" size="lg">
             <a
-              href="https://github.com/asicify/asicify"
+              href="https://github.com/claynicholson/asicify"
               target="_blank"
               rel="noreferrer"
             >

@@ -66,12 +66,12 @@ export default function AboutPage() {
                 Source
               </span>
               <a
-                href="https://github.com/asicify/asicify"
+                href="https://github.com/claynicholson/asicify"
                 target="_blank"
                 rel="noreferrer"
                 className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
               >
-                github.com/asicify/asicify
+                github.com/claynicholson/asicify
               </a>
             </li>
             <li className="flex gap-3">
@@ -79,7 +79,7 @@ export default function AboutPage() {
                 Issues
               </span>
               <a
-                href="https://github.com/asicify/asicify/issues"
+                href="https://github.com/claynicholson/asicify/issues"
                 target="_blank"
                 rel="noreferrer"
                 className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
@@ -92,7 +92,7 @@ export default function AboutPage() {
                 Discuss
               </span>
               <a
-                href="https://github.com/asicify/asicify/discussions"
+                href="https://github.com/claynicholson/asicify/discussions"
                 target="_blank"
                 rel="noreferrer"
                 className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
