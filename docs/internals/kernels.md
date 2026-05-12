@@ -12,16 +12,17 @@ contracts, the bit-exactness invariants, and the extension points.
 ```
 apps/worker/worker/kernels/
 ├── __init__.py        Empty marker
-├── quantize.py        INT8 / INT4 / ternary / binary quantization + bit-exact forward
-├── pack.py            Tensor -> SystemVerilog `localparam` literal strings
+├── quantize.py        INT8 / INT4 / ternary / binary / FP16 quantization + bit-exact forward
+├── pack.py            Tensor -> SystemVerilog `localparam` literal strings (5 formats)
 ├── sparsity.py        2:4, 4:8, block-16, unstructured magnitude pruning
-├── layers.py          LayerNorm, Embedding (and the QuantizedAttention dataclass)
+├── decompose.py       Low-rank SVD truncation (W ≈ A @ B)
+├── layers.py          LayerNorm, Embedding, QuantizedAttention dataclass
 └── attention.py       Integer softmax with LUT-based exp + reference attention
 ```
 
 Everything in this package is **pure**. No I/O, no global state, no Redis,
 no environment variable reads. Every function is a pure tensor → tensor
-mapping. This is what lets pytest run all 62 tests in 4.6 seconds.
+mapping. This is what lets pytest run all 80 tests in 4.6 seconds.
 
 ## The bit-exactness contract
 
@@ -37,21 +38,25 @@ forward, you must regenerate the matching template arm and rerun
 `tests/test_quantize_multi.py` and `tests/test_end_to_end.py`. Both
 suites run in under 5 seconds.
 
-## `quantize.py` — INT8 / INT4 / ternary / binary
+## `quantize.py` — INT8 / INT4 / ternary / binary / FP16
 
 ### `QuantizedLinear` dataclass
 
 The carrier. Stores the int8 weights in **canonical signed form** for
-every precision. INT4 weights live in `int8` tensors with values
-clipped to `[-7, 7]`. Ternary lives in `int8` tensors with values in
-`{-1, 0, 1}`. Binary in `{-1, +1}`.
+the integer precisions. INT4 weights live in `int8` tensors with
+values clipped to `[-7, 7]`. Ternary lives in `int8` tensors with values
+in `{-1, 0, 1}`. Binary in `{-1, +1}`.
+
+For FP16 the same field carries `float16` values directly. The dispatcher
+checks `q.quantization == "fp16"` and routes to a separate float-math
+forward.
 
 ```python
 @dataclass
 class QuantizedLinear:
-    quantization: str           # "int8" | "int4" | "ternary" | "binary"
-    weight_int8: torch.Tensor   # canonical signed form, dtype int8
-    scale: torch.Tensor         # float32, per-output-channel
+    quantization: str           # "int8" | "int4" | "ternary" | "binary" | "fp16"
+    weight_int8: torch.Tensor   # canonical signed form (dtype int8 for ints, float16 for fp16)
+    scale: torch.Tensor         # float32, per-output-channel (sentinel 1.0 for fp16)
     bias: torch.Tensor | None   # float32, per-output-channel
     in_features: int
     out_features: int
@@ -175,6 +180,40 @@ represent zero. The pipeline-level wrapper in
 `worker/pipeline/sparsity.py` checks `config.quantization == "binary"`
 and short-circuits. There's a test for this
 (`test_sparsity.test_binary_skips_sparsity`).
+
+## `decompose.py` — low-rank SVD truncation
+
+Replaces a `Linear(in, out)` with two smaller Linears: `Linear_B(in, r)`
+followed by `Linear_A(r, out)`. The pipeline does this *before*
+quantization, so the two factors get quantized like any other Linear.
+
+```python
+@dataclass
+class LowRankFactors:
+    a: torch.Tensor     # (out, rank)
+    b: torch.Tensor     # (rank, in)
+    bias: torch.Tensor | None
+    rank: int
+    in_features: int
+    out_features: int
+```
+
+`low_rank_decompose(W, b, rank)` does an SVD truncation, splitting the
+energy as `A = U sqrt(S)` and `B = sqrt(S) V^T`. Even split keeps
+downstream quantization well-conditioned.
+
+`parameter_savings(in, out, rank)` returns the fraction of parameters
+dropped. The pipeline wrapper in `worker/pipeline/decompose.py` skips
+layers where the decomposition would not actually save parameters (e.g.
+small layers with high rank).
+
+The pipeline replaces the original layer name with `<name>.b` and
+`<name>.a` and stashes per-layer reconstruction error in
+`graph.metadata["_decomp_info"]`. The downstream pack and template
+machinery treat the two factors as ordinary Linear layers.
+
+Monarch and butterfly factorizations are placeholders: the pipeline
+records intent in `_decomp_pending` but does not yet modify weights.
 
 ## `layers.py` — LayerNorm and Embedding
 
@@ -334,4 +373,4 @@ cd apps/worker
 python -m uv run pytest tests/ -v
 ```
 
-62 tests, ~5 seconds on CPU.
+80 tests, ~5 seconds on CPU.

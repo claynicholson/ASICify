@@ -74,8 +74,12 @@ module layer_{{ layer_view.symbol }} (
             byte_val = W_{{ layer_view.symbol }}[o][i >> 3];
             bit_val = byte_val[i[2:0]];
             unpack_w = bit_val ? 8'sd1 : -8'sd1;
+{% elif multiplier == 'fp16_lut' %}
+            // FP16 is handled in a different code path; this branch is here
+            // only because the function signature is shared. The fp16 module
+            // overrides the entire body below.
+            unpack_w = 8'sd0;
 {% else %}
-            // fp16_lut placeholder: treat W as int8.
             unpack_w = W_{{ layer_view.symbol }}[o][i];
 {% endif %}
         end

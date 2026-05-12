@@ -9,7 +9,7 @@ This page is a high-level orientation. The deep dives:
 
 - [kernels.md](kernels.md) — every kernel module in detail
 - [rtl-templates.md](rtl-templates.md) — every Verilog template
-- [testing.md](testing.md) — how the 62 tests are organized
+- [testing.md](testing.md) — how the 80 tests are organized
 
 ## Directory map
 
@@ -48,7 +48,7 @@ apps/worker/
 │       ├── cost.py
 │       ├── targets.py     Per-node cell library data
 │       └── runner.py      Top-level estimate()
-├── tests/                 62 pytest tests
+├── tests/                 80 pytest tests
 ├── pyproject.toml
 └── package.json
 ```

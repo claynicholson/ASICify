@@ -75,6 +75,9 @@ class QuantizedLinear:
     out_features: int
 
     def dequantize(self) -> torch.Tensor:
+        if self.quantization == "fp16":
+            # weight_int8 actually carries fp16 values for this precision.
+            return self.weight_int8.to(torch.float32)
         return self.weight_int8.to(torch.float32) * self.scale.unsqueeze(1)
 
     def reconstruction_error(self, original: torch.Tensor) -> float:
@@ -300,9 +303,12 @@ def linear_int8_forward(x: torch.Tensor, q: QuantizedLinear) -> torch.Tensor:
     """Bit-exact forward pass that matches the generated reference.py and the RTL.
 
     Works for INT8, INT4, ternary, binary because we store all of them in the
-    canonical signed-int form. The generated Verilog packs them differently
-    (nibbles, 2-bit ternary, 1-bit binary) but the integer math is identical.
+    canonical signed-int form. For FP16 this dispatches to a float path.
+    Returns int32 in either case.
     """
+    if q.quantization == "fp16":
+        return linear_fp16_forward(x, q)
+
     if x.dim() != 1:
         raise ValueError(f"expects 1D input; got shape {tuple(x.shape)}")
     if x.shape[0] != q.in_features:
@@ -316,3 +322,23 @@ def linear_int8_forward(x: torch.Tensor, q: QuantizedLinear) -> torch.Tensor:
     acc = w64 @ x64 + bq
     product = acc * sq31
     return (product >> 31).to(torch.int32)
+
+
+def linear_fp16_forward(x: torch.Tensor, q: QuantizedLinear) -> torch.Tensor:
+    """FP16 forward. Inputs cast to fp16, multiplied with fp16 weights, bias
+    added in fp16, then rounded to int32 so downstream layers can apply the
+    same int8 saturating clip the integer paths use.
+    """
+    if x.dim() != 1:
+        raise ValueError(f"expects 1D input; got shape {tuple(x.shape)}")
+    if x.shape[0] != q.in_features:
+        raise ValueError(f"input dim {x.shape[0]} != in_features {q.in_features}")
+    if q.quantization != "fp16":
+        raise ValueError("linear_fp16_forward called with non-fp16 quantization")
+
+    x_fp16 = x.to(torch.float16)
+    y_fp16 = q.weight_int8.to(torch.float16) @ x_fp16
+    if q.bias is not None:
+        y_fp16 = y_fp16 + q.bias.to(torch.float16)
+
+    return y_fp16.to(torch.float32).round().clamp(-(2**31), 2**31 - 1).to(torch.int32)

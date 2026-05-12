@@ -150,6 +150,33 @@ def ternary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
     )
 
 
+def fp16_array_to_sv(name: str, tensor: torch.Tensor) -> str:
+    """Pack FP16 weights as 16-bit hex literals.
+
+    Each FP16 value goes out as `16'h<bit-pattern>`. The Verilog FP16
+    multiplier reads these as IEEE half-precision floats. Compatible with
+    Verilator (which has $shortrealtobits) and synthesis tools that infer
+    fp16 multipliers from the right module pattern.
+    """
+    if tensor.dim() != 2 or tensor.dtype != torch.float16:
+        raise ValueError(
+            f"fp16_array_to_sv expects 2D float16; got "
+            f"shape={tuple(tensor.shape)} dtype={tensor.dtype}"
+        )
+    out_f, in_f = tensor.shape
+    rows: list[str] = []
+    for row in tensor.view(torch.int16).tolist():
+        # int16 view of fp16 bits; convert negative two's-complement back to
+        # the unsigned 16-bit hex pattern Verilog expects.
+        cells = ", ".join(f"16'h{(v & 0xFFFF):04x}" for v in row)
+        rows.append(f"        '{{ {cells} }}")
+    body = ",\n".join(rows)
+    return (
+        f"localparam logic [15:0] {name} [0:{out_f - 1}][0:{in_f - 1}] = "
+        f"'{{\n{body}\n    }};"
+    )
+
+
 def binary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
     """Pack binary weights 8-per-byte. Encoding: 1=+1, 0=-1. LSB first."""
     if tensor.dim() != 2 or tensor.dtype != torch.int8:
@@ -233,8 +260,9 @@ def pack_layer(symbol: str, q: QuantizedLinear) -> str:
         weights_sv = ternary_array_to_sv(f"W_{symbol}", q.weight_int8)
     elif q.quantization == "binary":
         weights_sv = binary_array_to_sv(f"W_{symbol}", q.weight_int8)
+    elif q.quantization == "fp16":
+        weights_sv = fp16_array_to_sv(f"W_{symbol}", q.weight_int8)
     else:
-        # FP16 placeholder - emit as int8 (kernel uses int8 too for now)
         weights_sv = int8_array_to_sv(f"W_{symbol}", q.weight_int8)
 
     return "\n".join(

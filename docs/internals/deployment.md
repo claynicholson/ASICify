@@ -226,7 +226,7 @@ When real model loading and validation come online, reinstate the GPU.
   run: uv run pytest -q
 ```
 
-Runs all 62 tests. Currently ~15 seconds end-to-end (most of which is
+Runs all 80 tests. Currently ~15 seconds end-to-end (most of which is
 the uv install).
 
 ### `rtl-lint-and-synth`

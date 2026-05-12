@@ -3,13 +3,16 @@
 This file mirrors the arithmetic in the generated Verilog. Drive both with
 the same int8 input stream and the outputs match exactly.
 
-Layout matches what's in weights.vh:
-  W_<symbol>          int8 weights, shape (out_features, in_features)
-  SCALE_Q31_<symbol>  per-output-channel Q0.31 fixed-point scale
-  BIAS_Q_<symbol>     per-output-channel bias in pre-rescale int32 units
+For integer precisions (INT8, INT4, ternary, binary):
+  W_<sym>            canonical signed int8 weights
+  SCALE_Q31_<sym>    per-output-channel Q0.31 fixed-point scale
+  BIAS_Q_<sym>       per-output-channel bias in pre-rescale int32 units
 
-The reference uses int64 for the rescale product so we exactly match the
-64-bit signed multiply + arithmetic right shift in the RTL.
+For FP16:
+  W_<sym>            float16 weights (stored as float lists in JSON)
+  BIAS_FP16_<sym>    float16 bias
+
+QUANT_<sym> tells the dispatcher which path to take.
 
 Quantization: {{ config.quantization }}
 Multiplier:   {{ multiplier }}
@@ -40,25 +43,40 @@ PIPELINE = [
         "symbol": "{{ view.symbol }}",
         "in_features": {{ view.in_features }},
         "out_features": {{ view.out_features }},
+        "quantization": "{{ view.quantization }}",
     },
 {% endfor %}
 ]
 
 
-def _layer_forward(
+def _layer_forward_int(
     x_int8: np.ndarray,
     w_int8: np.ndarray,
     scale_q31: np.ndarray,
     bias_q: np.ndarray,
 ) -> np.ndarray:
-    """Compute one Linear layer in the same arithmetic the RTL uses."""
+    """One Linear layer in the same arithmetic the integer RTL uses."""
     x = x_int8.astype(np.int64)
     w = w_int8.astype(np.int64)
     acc = w @ x + bias_q.astype(np.int64)
-
     product = acc * scale_q31.astype(np.int64)
-    rescaled = product >> 31  # arithmetic right shift, matches >>> 31 in SV
+    rescaled = product >> 31
     return rescaled.astype(np.int32)
+
+
+def _layer_forward_fp16(
+    x_int8: np.ndarray,
+    w_fp16: np.ndarray,
+    bias_fp16: np.ndarray,
+) -> np.ndarray:
+    """One Linear layer in FP16 (matches PyTorch's float16 dtype)."""
+    x = x_int8.astype(np.float16)
+    w = w_fp16.astype(np.float16)
+    y = (w @ x).astype(np.float16)
+    if bias_fp16 is not None:
+        y = (y + bias_fp16.astype(np.float16)).astype(np.float16)
+    # Round to int32 for downstream compatibility.
+    return np.clip(np.rint(y.astype(np.float32)), -2**31, 2**31 - 1).astype(np.int32)
 
 
 def _saturating_clip_int8(x: np.ndarray) -> np.ndarray:
@@ -76,10 +94,17 @@ def reference_forward(x_int8: Iterable[int]) -> np.ndarray:
 
     for i, stage in enumerate(PIPELINE):
         sym = stage["symbol"]
-        w_int8 = np.array(WEIGHTS[f"W_{sym}"], dtype=np.int8)
-        scale_q31 = np.array(WEIGHTS[f"SCALE_Q31_{sym}"], dtype=np.int64)
-        bias_q = np.array(WEIGHTS[f"BIAS_Q_{sym}"], dtype=np.int64)
-        y_int32 = _layer_forward(x, w_int8, scale_q31, bias_q)
+        quant = stage.get("quantization", "int8")
+
+        if quant == "fp16":
+            w = np.array(WEIGHTS[f"W_{sym}"], dtype=np.float16)
+            b = np.array(WEIGHTS[f"BIAS_FP16_{sym}"], dtype=np.float16)
+            y_int32 = _layer_forward_fp16(x, w, b)
+        else:
+            w_int8 = np.array(WEIGHTS[f"W_{sym}"], dtype=np.int8)
+            scale_q31 = np.array(WEIGHTS[f"SCALE_Q31_{sym}"], dtype=np.int64)
+            bias_q = np.array(WEIGHTS[f"BIAS_Q_{sym}"], dtype=np.int64)
+            y_int32 = _layer_forward_int(x, w_int8, scale_q31, bias_q)
 
         if i < len(PIPELINE) - 1:
             x = _saturating_clip_int8(y_int32)

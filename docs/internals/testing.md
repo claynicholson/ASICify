@@ -1,6 +1,6 @@
 # Testing
 
-Everything verifiable runs in pytest. As of writing, **62 tests in 4.6
+Everything verifiable runs in pytest. As of writing, **80 tests in 4.6
 seconds** on CPU. The test suite is the canonical source of truth for
 "does the compiler still work" — CI runs it on every push.
 
@@ -29,15 +29,18 @@ that the bit-exactness test in the worker indirectly covers).
 ```
 apps/worker/tests/
 ├── __init__.py
-├── test_quantize.py          INT8 quantizer + bit-exact forward (6 tests)
-├── test_pack.py              All four packing formats (5 tests)
-├── test_quantize_multi.py    Bit-exactness across all four precisions × generated reference.py (15 tests)
-├── test_sparsity.py          All four sparsity patterns + pipeline integration + binary skip (9 tests)
-├── test_layers.py            LayerNorm, Embedding kernels + render to package (5 tests)
-├── test_attention.py         Softmax LUT, softmax_int, attention_int_forward, Q/K/V/O renders (7 tests)
-├── test_validate.py          Activation-MSE, ordering across precisions, top1, fallback (4 tests)
-├── test_loader.py            parse_model dispatch (module/checkpoint/HF stub), error messages (6 tests)
-└── test_end_to_end.py        Full TinyMLP → RTL → reference 32-trial bit-exactness (5 tests)
+├── test_quantize.py             INT8 quantizer + bit-exact forward (6 tests)
+├── test_pack.py                 All five packing formats (5 tests)
+├── test_quantize_multi.py       Bit-exactness across INT8/INT4/ternary/binary × generated reference.py (15 tests)
+├── test_fp16.py                 FP16 kernel + dispatch + reference bit-exactness (5 tests)
+├── test_sparsity.py             All four sparsity patterns + pipeline integration + binary skip (9 tests)
+├── test_decompose.py            Low-rank SVD + Monarch placeholder + pipeline integration (8 tests)
+├── test_layers.py               LayerNorm, Embedding kernels + render to package (5 tests)
+├── test_attention.py            Softmax LUT, softmax_int, attention_int_forward, Q/K/V/O renders (7 tests)
+├── test_attention_autodetect.py HF-style attention parser + structural attention rendering (5 tests)
+├── test_validate.py             Activation-MSE, ordering across precisions, top1, fallback (4 tests)
+├── test_loader.py               parse_model dispatch (module/checkpoint/HF stub), error messages (6 tests)
+└── test_end_to_end.py           Full TinyMLP → RTL → reference 32-trial bit-exactness (5 tests)
 ```
 
 ## What each test guarantees

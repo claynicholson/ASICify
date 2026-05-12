@@ -205,8 +205,12 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
     for view in linear_views:
         per_layer_ctx = dict(ctx)
         per_layer_ctx["multiplier"] = _multiplier_strategy(view["quantization"])
+        # FP16 takes a separate template since the math is float, not int.
+        template_name = (
+            "fp16_layer.v.j2" if view["quantization"] == "fp16" else "linear_layer.v.j2"
+        )
         files[f"modules/{view['module_name']}.v"] = env.get_template(
-            "linear_layer.v.j2"
+            template_name
         ).render(layer_view=view, **per_layer_ctx)
 
     for view in layernorm_views:
@@ -256,9 +260,21 @@ def _build_weights_json(linear_views: list[dict[str, Any]]) -> str:
         if ql is None:
             continue
         sym = view["symbol"]
-        out[f"W_{sym}"] = ql.weight_int8.to(torch.int64).tolist()
 
-        # Q0.31 scale, same conversion the pack module does.
+        if ql.quantization == "fp16":
+            # FP16 path: emit weights as float lists; reference.py uses np.float16.
+            out[f"W_{sym}"] = ql.weight_int8.to(torch.float32).tolist()
+            out[f"BIAS_FP16_{sym}"] = (
+                ql.bias.to(torch.float32).tolist()
+                if ql.bias is not None
+                else [0.0] * ql.out_features
+            )
+            out[f"QUANT_{sym}"] = "fp16"
+            continue
+
+        out[f"W_{sym}"] = ql.weight_int8.to(torch.int64).tolist()
+        out[f"QUANT_{sym}"] = ql.quantization
+
         scale_q31 = (
             (ql.scale.to(torch.float64) * (1 << 31))
             .round()
@@ -268,7 +284,6 @@ def _build_weights_json(linear_views: list[dict[str, Any]]) -> str:
         )
         out[f"SCALE_Q31_{sym}"] = scale_q31
 
-        # Bias in pre-rescale int32 units.
         if ql.bias is None:
             out[f"BIAS_Q_{sym}"] = [0] * ql.out_features
         else:

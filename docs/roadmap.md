@@ -8,7 +8,7 @@ source of truth.
 
 The compiler core works end-to-end across four quantization precisions. The
 bit-exactness contract (`kernel forward == generated reference.py`) is
-locked in by 62 pytest tests in
+locked in by 80 pytest tests in
 [`apps/worker/tests/`](../apps/worker/tests/), running in ~5 seconds on CPU.
 
 ### Compiler
@@ -20,14 +20,26 @@ locked in by 62 pytest tests in
 - [x] Real INT4 in [-7, 7] with per-row scale (CSD shift-add multiplier)
 - [x] Real ternary {-1, 0, +1} (TWN-style threshold + per-row scale)
 - [x] Real binary {-1, +1} with per-row alpha
+- [x] Real FP16 (separate float-math path; weights stored as fp16, RTL uses
+      behavioral float multiplier with $bitstoshortreal)
 - [x] Multi-precision multiplier strategies all wired through real kernels:
-      `xnor_popcount`, `sign_flip_mux`, `csd_shift_add`, `booth`
+      `xnor_popcount`, `sign_flip_mux`, `csd_shift_add`, `booth`, `fp16_lut`
 - [x] Real magnitude pruning: 2:4, 4:8, block-sparse 16x16, unstructured
       (operates on float weights before quantization; zeros propagate)
 - [x] Binary-precision sparsity skip (binary can't represent zero)
 - [x] Real LayerNorm quantization (Q15 gamma/beta as int32)
 - [x] Real Embedding quantization (per-column INT8 ROM table)
 - [x] Integer softmax kernel with LUT-based exp + reference attention
+- [x] **HF attention block auto-detection** in the parser. Models with
+      `q_proj/k_proj/v_proj/o_proj` (llama, mistral, gemma) or
+      `query/key/value/output.dense` (BERT-style) naming get collapsed
+      into a single `QuantizedAttention` and rendered as one
+      `attention_<sym>.v` module that wires the four projections + the
+      shared softmax + KV cache.
+- [x] **Low-rank SVD decomposition** that actually factors weight
+      tensors and inserts two synthetic Linear layers (B then A) into
+      the graph. Pipeline metadata records reconstruction error per
+      decomposed layer.
 - [x] HuggingFace model loader (in `hosted` extra) — module / checkpoint /
       huggingface dispatch
 - [x] Real activation-MSE validation: dequantize, run, compare per-layer
@@ -72,20 +84,15 @@ locked in by 62 pytest tests in
 
 ## Partial — wired but not exhaustive
 
-- [~] **HF attention block auto-detection in the parser**. Q/K/V/O
-      projections render as separate Linear layers today, which is
-      correct but loses the structural relationship. A pass that
-      recognizes `XxxAttention` modules and groups their projections
-      into a `QuantizedAttention` is the next-largest piece of work.
-- [~] **FP16 quantization**. The dispatcher accepts `fp16` and the
-      `linear_layer.v.j2` template has an arm marked `fp16_lut`, but
-      the kernel currently falls back to int8 quantization for fp16.
-      A real FP16 kernel needs per-multiplier ROM-LUTs.
-- [~] **Decomposition**. The pipeline records the decomposition config
-      but doesn't yet factor matrices. Monarch and butterfly
-      factorization need both a kernel (factor float weights into
-      block-diagonal A and B) and template work (replace one Linear
-      with a chain of three smaller Linears).
+- [~] **Monarch and butterfly decomposition**. The pipeline records
+      intent for these and emits a `_decomp_pending` metadata key, but
+      the actual block-diagonal factorization kernels aren't written.
+      Low-rank SVD truncation is fully wired (see "Shipped" above).
+- [~] **Attention KV cache wiring**. The `kv_cache.v` and `softmax.v`
+      modules are emitted in every package, and the
+      `attention_block.v.j2` wires them in for single-token attention.
+      Multi-token attention with a real KV-cache rotation is the next
+      template iteration.
 
 ## Not yet started
 
