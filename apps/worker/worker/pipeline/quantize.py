@@ -67,11 +67,11 @@ def estimate_quality_delta(
     graph: ModelGraph, baseline_metric: float, config: CompressionConfig
 ) -> float:
     """Coarse first-order metric. The validator now uses real activation MSE."""
-    PENALTY: dict[Quantization, float] = {
+    penalty: dict[Quantization, float] = {
         "fp16": 1.0,
         "int8": 1.005,
         "int4": 1.04,
         "ternary": 1.18,
         "binary": 1.45,
     }
-    return baseline_metric * PENALTY[config.quantization]
+    return baseline_metric * penalty[config.quantization]

@@ -1,8 +1,8 @@
 """Area model. Sums:
-  - multiplier area (precision × multiplier count)
-  - storage area (mask ROM × bits)
+  - multiplier area (precision x multiplier count)
+  - storage area (mask ROM x bits)
   - SRAM area (KV cache, activation buffers)
-  - routing overhead (~1.5×)
+  - routing overhead (~1.5x)
   - I/O ring (fixed for given pad count)
 """
 

@@ -22,7 +22,6 @@ from dataclasses import dataclass
 
 import torch
 
-
 # ---------------------------------------------------------------------------
 # Common helpers
 # ---------------------------------------------------------------------------
@@ -68,7 +67,8 @@ class QuantizedLinear:
     """
 
     quantization: str  # "int8" | "int4" | "ternary" | "binary"
-    weight_int8: torch.Tensor  # int8 in canonical form (one weight per element); also used for INT4/ternary/binary in their canonical {-128..127} representation for packing comparison
+    # int8 canonical form; also used for INT4/ternary/binary in {-128..127} for packing
+    weight_int8: torch.Tensor
     scale: torch.Tensor  # float32, per-output-channel
     bias: torch.Tensor | None
     in_features: int

@@ -12,17 +12,15 @@ artifact.
 
 from __future__ import annotations
 
+import json
 import zipfile
 from collections.abc import Awaitable, Callable
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
-
-import json
-
 import torch
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from worker.kernels.attention import build_softmax_lut
 from worker.kernels.layers import (
@@ -254,7 +252,7 @@ def _build_weights_json(linear_views: list[dict[str, Any]]) -> str:
     contain as a literal). The values are nested lists of ints, matching the
     Verilog representation cell-for-cell.
     """
-    out: dict[str, list] = {}
+    out: dict[str, Any] = {}
     for view in linear_views:
         ql = view["quantized"]
         if ql is None:

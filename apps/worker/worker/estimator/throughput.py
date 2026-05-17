@@ -3,7 +3,7 @@
   pipeline_depth = number of pipeline stages
   cycles_per_token = max over layers (since pipelined)
   throughput = clock_freq / cycles_per_token
-  latency = depth × cycle_time (single-token first-fill)
+  latency = depth x cycle_time (single-token first-fill)
 """
 
 from __future__ import annotations
@@ -25,8 +25,9 @@ def estimate_throughput(graph: ModelGraph, target: str) -> dict[str, float]:
 
     # Crude: assume largest layer's MACs / available multipliers cycles
     parallel_macs = 4096
+    relevant_kinds = ("linear", "ffn", "attention")
     largest_layer_params = max(
-        (l.param_count for l in graph.layers if l.kind in ("linear", "ffn", "attention")),
+        (layer.param_count for layer in graph.layers if layer.kind in relevant_kinds),
         default=1,
     )
     cycles_per_token = max(1, largest_layer_params // parallel_macs)

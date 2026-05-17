@@ -14,9 +14,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import torch
-from torch import nn
-
 from worker.kernels.decompose import low_rank_decompose
 from worker.types import CompressionConfig, LayerInfo, ModelGraph
 
@@ -108,7 +105,11 @@ def _apply_low_rank(graph: ModelGraph, rank: int) -> ModelGraph:
                 out_features=layer.out_features,
                 param_count=factors.rank * layer.out_features
                 + (layer.out_features if original_b is not None else 0),
-                metadata={"has_bias": original_b is not None, "decomposed_from": layer.name, "factor": "a"},
+                metadata={
+                    "has_bias": original_b is not None,
+                    "decomposed_from": layer.name,
+                    "factor": "a",
+                },
             )
         )
 
@@ -129,4 +130,4 @@ def _apply_low_rank(graph: ModelGraph, rank: int) -> ModelGraph:
 
 def _blocks_for(m: int, n: int) -> int:
     """Heuristic Monarch block count: cube root of dim product."""
-    return max(2, int(round((m * n) ** (1 / 3))))
+    return max(2, round((m * n) ** (1 / 3)))

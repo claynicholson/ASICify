@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import math
+from typing import Any
 
 import torch
 from torch import nn
@@ -58,7 +59,7 @@ def validate_with_data(
     inputs: torch.Tensor,
     targets: torch.Tensor | None = None,
     metric: str = "activation_mse",
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """User-supplied dataset entry point.
 
     Args:
@@ -225,11 +226,11 @@ def _infer_input_dim(graph: ModelGraph) -> int | None:
 
 
 def _analytical_penalty(baseline: float, config: CompressionConfig) -> float:
-    PENALTY = {
+    penalty = {
         "fp16": 1.0,
         "int8": 1.005,
         "int4": 1.04,
         "ternary": 1.18,
         "binary": 1.45,
     }
-    return baseline * PENALTY.get(config.quantization, 1.0)
+    return baseline * penalty.get(config.quantization, 1.0)

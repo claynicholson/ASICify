@@ -65,8 +65,8 @@ def apply_unstructured(weight: torch.Tensor, ratio: float) -> torch.Tensor:
         raise ValueError(f"ratio must be in [0, 1); got {ratio}")
     if ratio == 0.0:
         return weight.clone()
-    out_f, in_f = weight.shape
-    keep = max(1, int(round(in_f * (1.0 - ratio))))
+    _out_f, in_f = weight.shape
+    keep = max(1, round(in_f * (1.0 - ratio)))
     abs_w = weight.abs()
     _, idx = abs_w.topk(keep, dim=-1)
     mask = torch.zeros_like(weight, dtype=torch.bool)
@@ -93,7 +93,7 @@ def apply_block_sparse(weight: torch.Tensor, ratio: float, block: int = 16) -> t
     tiled = w.reshape(tiles_o, block, tiles_i, block)
     abs_means = tiled.abs().mean(dim=(1, 3))  # (tiles_o, tiles_i)
     n_tiles = tiles_o * tiles_i
-    drop = max(0, int(round(n_tiles * ratio)))
+    drop = max(0, round(n_tiles * ratio))
     if drop == 0:
         return weight.clone()
     flat = abs_means.reshape(-1)

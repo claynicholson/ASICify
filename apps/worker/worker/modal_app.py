@@ -21,7 +21,6 @@ Deployment requires the `hosted` extra plus `modal`:
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 # Import is lazy so the rest of the worker package doesn't depend on modal.
@@ -56,7 +55,9 @@ if modal is not None:
 
     secrets = [
         modal.Secret.from_name("asicify-redis", required_keys=["REDIS_URL"]),
-        modal.Secret.from_name("asicify-r2", required_keys=["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]),
+        modal.Secret.from_name(
+            "asicify-r2", required_keys=["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+        ),
     ]
 
     # Single-job container. Modal spins one up per call and tears it down after.

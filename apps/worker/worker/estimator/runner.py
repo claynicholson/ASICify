@@ -9,8 +9,8 @@ from worker.estimator.area import estimate_area
 from worker.estimator.cost import estimate_cost
 from worker.estimator.targets import ASIC_NODES, FPGAS
 from worker.estimator.throughput import estimate_throughput
-from worker.pipeline.parse import parse_model
 from worker.pipeline.orchestrator import _cfg_from_dict
+from worker.pipeline.parse import parse_model
 from worker.types import CompressionConfig, ModelGraph
 
 EmitFn = Callable[[dict[str, Any]], Awaitable[None]]
@@ -76,11 +76,11 @@ def _energy(target: str, config: CompressionConfig) -> float:
     if base is None:
         # FPGAs: rough constant
         return 1.5
-    SCALE = {
+    scale = {
         "fp16": 4.0,
         "int8": 1.0,
         "int4": 0.18,
         "ternary": 0.04,
         "binary": 0.015,
     }
-    return base.energy_int8_pj * SCALE[config.quantization]
+    return base.energy_int8_pj * scale[config.quantization]

@@ -143,19 +143,22 @@ def parse_module(
         # If this module is itself an attention block, record it as one layer.
         if module_name in attention_parents:
             attn = attention_parents[module_name]
+            embed_dim: int = int(attn["embed_dim"])  # type: ignore[call-overload]
+            num_heads: int = int(attn["num_heads"])  # type: ignore[call-overload]
+            children_dict: dict[str, nn.Module] = attn["children"]  # type: ignore[assignment]
             info = LayerInfo(
                 name=module_name,
                 kind="attention",
-                in_features=attn["embed_dim"],
-                out_features=attn["embed_dim"],
+                in_features=embed_dim,
+                out_features=embed_dim,
                 param_count=sum(
                     p.numel()
-                    for child in attn["children"].values()
+                    for child in children_dict.values()
                     for p in child.parameters()
                 ),
                 metadata={
-                    "num_heads": attn["num_heads"],
-                    "head_dim": attn["embed_dim"] // attn["num_heads"],
+                    "num_heads": num_heads,
+                    "head_dim": embed_dim // num_heads,
                     "naming": attn["naming"],
                 },
             )
@@ -213,7 +216,10 @@ def _classify_module(name: str, module: nn.Module) -> tuple[str | None, LayerInf
             kind="linear",
             in_features=module.in_features,
             out_features=module.out_features,
-            param_count=module.weight.numel() + (module.bias.numel() if module.bias is not None else 0),
+            param_count=(
+                module.weight.numel()
+                + (module.bias.numel() if module.bias is not None else 0)
+            ),
             metadata={"has_bias": module.bias is not None},
         )
         return "linear", info

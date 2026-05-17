@@ -20,7 +20,6 @@ import math
 
 import torch
 
-
 # ---------------------------------------------------------------------------
 # Softmax LUT
 # ---------------------------------------------------------------------------
@@ -109,7 +108,7 @@ def attention_int_forward(
 
     logits = k64 @ q64  # (seq_len,)
     # Right-shift by log2(sqrt(head_dim)) ≈ ceil(log2(head_dim) / 2)
-    shift = max(1, int(math.ceil(math.log2(max(head_dim, 2)) / 2)))
+    shift = max(1, math.ceil(math.log2(max(head_dim, 2)) / 2))
     logits = logits >> shift
 
     weights_q15 = softmax_int(logits.to(torch.int32))

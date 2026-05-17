@@ -11,9 +11,9 @@ from typing import Any
 import redis.asyncio as redis
 import structlog
 
+from worker.estimator.runner import run_estimate_job
 from worker.pipeline.orchestrator import run_compression_job
 from worker.rtl.generator import run_rtl_job
-from worker.estimator.runner import run_estimate_job
 
 log = structlog.get_logger()
 
@@ -38,7 +38,7 @@ async def main() -> None:
         except asyncio.CancelledError:
             log.info("worker.shutdown")
             break
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("worker.error", error=str(e))
             await asyncio.sleep(1)
 
@@ -69,7 +69,7 @@ async def dispatch(client: redis.Redis, job: dict[str, Any]) -> None:
 
         await emit({"event": "complete"})
         log.info("job.done", job_id=job_id, elapsed=time.monotonic() - started)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.exception("job.failed", job_id=job_id)
         await emit({"event": "error", "message": str(e)})
 

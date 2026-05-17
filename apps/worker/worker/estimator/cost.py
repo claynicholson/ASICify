@@ -2,7 +2,7 @@
   wafer cost / dies-per-wafer (Murphy yield)
   + NRE amortized over volume
   + packaging + test
-  × margin
+  x margin
 """
 
 from __future__ import annotations

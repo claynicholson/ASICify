@@ -26,7 +26,6 @@ import torch
 
 from worker.kernels.quantize import QuantizedLinear
 
-
 # ---------------------------------------------------------------------------
 # Scale + bias tables (precision-independent)
 # ---------------------------------------------------------------------------

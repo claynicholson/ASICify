@@ -23,7 +23,6 @@ import torch
 
 from worker.kernels.quantize import QuantizedLinear, quantize_linear_int8
 
-
 # ---------------------------------------------------------------------------
 # LayerNorm
 # ---------------------------------------------------------------------------
@@ -70,7 +69,7 @@ def quantize_layernorm(module: torch.nn.LayerNorm) -> QuantizedLayerNorm:
     beta_q15 = (
         (beta * (1 << 15)).round().clamp(-(2**31), 2**31 - 1).to(torch.int32)
     )
-    eps_q15 = int(round(eps * (1 << 15)))
+    eps_q15 = round(eps * (1 << 15))
     return QuantizedLayerNorm(gamma_q15=gamma_q15, beta_q15=beta_q15, eps_q15=eps_q15, dim=dim)
 
 
@@ -98,7 +97,7 @@ def layernorm_int_forward(x_int8: torch.Tensor, qln: QuantizedLayerNorm) -> torc
 
     # 1 / sqrt(var) in Q15.
     inv_std_float = 1.0 / (float(var_term) ** 0.5)
-    inv_std_q15 = int(round(inv_std_float * (1 << 15)))
+    inv_std_q15 = round(inv_std_float * (1 << 15))
 
     # norm = centered * inv_std_q15 (>>15 to keep Q0)
     norm = (centered * inv_std_q15) >> 15

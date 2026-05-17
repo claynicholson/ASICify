@@ -22,7 +22,7 @@ class NodeParams:
 
 
 # Numbers from public papers, foundry data sheets, and academic estimates.
-# All have ±20–40% uncertainty; the estimator surfaces this as confidence bands.
+# All have +/-20-40% uncertainty; the estimator surfaces this as confidence bands.
 ASIC_NODES: dict[str, NodeParams] = {
     "sky130": NodeParams(1.2, 4.0, 2400, 250, 0.9, 1500, 200, 50_000, 0.5),
     "gf22fdx": NodeParams(0.18, 0.55, 380, 1200, 0.18, 5500, 300, 1_500_000, 0.15),
