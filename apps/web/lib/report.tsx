@@ -22,8 +22,8 @@ import { formatArea, formatCompact, formatUSD } from "@/lib/utils";
 
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: "#0A0B0E",
-    color: "#F4F5F7",
+    backgroundColor: "#F4EFE6",
+    color: "#1F1B16",
     fontFamily: "Helvetica",
     fontSize: 10,
     padding: 48,
@@ -32,34 +32,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    borderBottomColor: "#232730",
+    borderBottomColor: "#B8AC92",
     borderBottomWidth: 1,
     paddingBottom: 12,
     marginBottom: 24,
   },
   brand: {
-    fontSize: 20,
-    fontWeight: 700,
+    fontSize: 22,
+    fontWeight: 400,
+    fontFamily: "Times-Roman",
     letterSpacing: -0.6,
+    color: "#1F1B16",
   },
   brandAccent: {
-    color: "#5B8FF9",
+    color: "#E0531F",
   },
   meta: {
     fontSize: 8,
-    color: "#A0A6B1",
+    color: "#8B7F6B",
+    fontFamily: "Courier",
     textAlign: "right",
   },
   h2: {
-    fontSize: 14,
-    fontWeight: 700,
+    fontSize: 15,
+    fontWeight: 400,
+    fontFamily: "Times-Roman",
     marginTop: 24,
     marginBottom: 8,
-    color: "#F4F5F7",
+    color: "#1F1B16",
   },
   label: {
-    color: "#6B7280",
+    color: "#8B7F6B",
     fontSize: 8,
+    fontFamily: "Courier",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 2,
@@ -72,35 +77,37 @@ const styles = StyleSheet.create({
   metricCell: {
     width: "33%",
     padding: 8,
-    borderColor: "#232730",
+    borderColor: "#DCD3BF",
     borderWidth: 1,
     marginRight: -1,
     marginBottom: -1,
+    backgroundColor: "#EFE9DC",
   },
   metricValue: {
     fontSize: 14,
     fontWeight: 700,
     fontFamily: "Courier",
-    color: "#F4F5F7",
+    color: "#1F1B16",
   },
   paragraph: {
-    color: "#A0A6B1",
+    color: "#534A3C",
     lineHeight: 1.5,
     marginBottom: 6,
   },
   table: {
     marginTop: 8,
-    borderTopColor: "#232730",
+    borderTopColor: "#B8AC92",
     borderTopWidth: 1,
   },
   tr: {
     flexDirection: "row",
-    borderBottomColor: "#232730",
+    borderBottomColor: "#DCD3BF",
     borderBottomWidth: 1,
     paddingVertical: 6,
   },
   th: {
-    color: "#6B7280",
+    color: "#8B7F6B",
+    fontFamily: "Courier",
     fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 0.6,
@@ -110,6 +117,7 @@ const styles = StyleSheet.create({
     fontFamily: "Courier",
     flex: 1,
     fontSize: 9,
+    color: "#1F1B16",
   },
   footer: {
     position: "absolute",
@@ -117,7 +125,8 @@ const styles = StyleSheet.create({
     left: 48,
     right: 48,
     fontSize: 8,
-    color: "#6B7280",
+    fontFamily: "Courier",
+    color: "#8B7F6B",
     textAlign: "center",
   },
 });
@@ -157,14 +166,14 @@ export function HardwareReport(input: ReportInput) {
 
   return (
     <Document
-      title={`ASICify report — ${model.display_name}`}
+      title={`ASICify report: ${model.display_name}`}
       author="ASICify"
       subject="Hardware feasibility report"
     >
       <Page size="LETTER" style={styles.page}>
         <View style={styles.header} fixed>
           <Text style={styles.brand}>
-            ASIC<Text style={styles.brandAccent}>|</Text>fy
+            ASICify<Text style={styles.brandAccent}>.</Text>
           </Text>
           <Text style={styles.meta}>
             Hardware report · {input.generatedAt.toISOString().slice(0, 10)}

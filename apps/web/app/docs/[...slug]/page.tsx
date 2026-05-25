@@ -50,9 +50,9 @@ export default async function DocPage({ params }: PageProps) {
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
           components={{
-            // Rewrite internal .md links → site routes
+            // Rewrite internal .md links → site routes, relative to the current doc.
             a: ({ href, children, ...props }) => {
-              const rewritten = rewriteHref(href);
+              const rewritten = rewriteHref(href, doc.sourcePath);
               const isExternal = rewritten?.startsWith("http");
               return (
                 <a
@@ -117,31 +117,79 @@ export default async function DocPage({ params }: PageProps) {
   );
 }
 
-/** Rewrite `../foo.md` and `foo.md` style links into `/docs/foo` site routes. */
-function rewriteHref(href: string | undefined): string | undefined {
+/**
+ * Rewrite a markdown link href into the correct site URL, resolving any
+ * `./` and `../` segments against the current doc file's directory.
+ *
+ * `sourcePath` is the repo-root-relative path of the current markdown file,
+ * e.g. "docs/internals/README.md" or "docs/codebase.md".
+ *
+ * Handles `.md`, `.md#fragment`, and `.md?query` patterns.
+ */
+function rewriteHref(
+  href: string | undefined,
+  sourcePath: string,
+): string | undefined {
   if (!href) return href;
-  if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#")) {
+  if (
+    href.startsWith("http") ||
+    href.startsWith("mailto:") ||
+    href.startsWith("#") ||
+    href.startsWith("/")
+  ) {
     return href;
   }
 
-  // Strip leading ../ and ./ segments
-  let h = href.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
+  // Split off any #fragment or ?query so the .md stripper still matches.
+  const m = /^([^#?]*)([#?].*)?$/.exec(href);
+  if (!m) return href;
+  let path = m[1];
+  const suffix = m[2] ?? "";
 
-  // Map "docs/foo.md" → "/docs/foo"
-  if (h.startsWith("docs/")) h = h.slice(5);
+  // Compute the current markdown file's directory, relative to docs/.
+  // e.g. "docs/internals/README.md" → baseDir = "internals"
+  //      "docs/codebase.md"         → baseDir = ""
+  let baseDir = "";
+  const inDocs = sourcePath.startsWith("docs/")
+    ? sourcePath.slice(5)
+    : sourcePath;
+  const lastSlash = inDocs.lastIndexOf("/");
+  if (lastSlash >= 0) baseDir = inDocs.slice(0, lastSlash);
 
-  // Strip .md extension
-  h = h.replace(/\.md$/i, "");
+  if (path.startsWith("./")) path = path.slice(2);
 
-  // External-to-docs source files (apps/web/lib/foo.ts) → GitHub link
-  if (h.startsWith("apps/") || h.startsWith("packages/") || h.startsWith("infra/")) {
-    return `https://github.com/claynicholson/asicify/blob/main/${h}`;
+  while (path.startsWith("../")) {
+    path = path.slice(3);
+    baseDir = baseDir.includes("/")
+      ? baseDir.slice(0, baseDir.lastIndexOf("/"))
+      : "";
   }
 
-  // Anything else under the repo root we don't recognize → leave alone
-  if (h.includes("/") || /^[a-z][a-z0-9-]*$/.test(h)) {
-    // Looks like a docs slug
-    return `/docs/${h}`;
+  // Absolute repo paths like "docs/foo.md" reset the base.
+  if (path.startsWith("docs/")) {
+    path = path.slice(5);
+    baseDir = "";
+  }
+
+  const combined = baseDir ? `${baseDir}/${path}` : path;
+  const stripped = combined.replace(/\.md$/i, "");
+
+  // Repo source files → GitHub blob.
+  if (
+    stripped.startsWith("apps/") ||
+    stripped.startsWith("packages/") ||
+    stripped.startsWith("infra/")
+  ) {
+    return `https://github.com/claynicholson/asicify/blob/main/${stripped}${suffix}`;
+  }
+
+  // README at repo root → repo home on GitHub.
+  if (stripped === "README") {
+    return `https://github.com/claynicholson/asicify${suffix}`;
+  }
+
+  if (stripped.includes("/") || /^[a-z][a-z0-9-]*$/.test(stripped)) {
+    return `/docs/${stripped}${suffix}`;
   }
 
   return href;

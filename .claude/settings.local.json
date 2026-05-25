@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Skill(anthropic-skills:algorithmic-art)",
+      "Skill(anthropic-skills:algorithmic-art:*)"
+    ]
+  }
+}

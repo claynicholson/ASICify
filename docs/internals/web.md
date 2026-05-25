@@ -178,9 +178,11 @@ their tweaks to be reflected, even if rough.
 
 ## API client
 
-[`lib/api.ts`](../../apps/web/lib/api.ts) is a small `fetch` wrapper with
-auth bearer header and a `subscribeProgress(projectId, onEvent)` helper that
-opens a WebSocket and dispatches typed `ProgressEvent` messages.
+`lib/api.ts` will be a small `fetch` wrapper with an auth bearer header and
+a `subscribeProgress(projectId, onEvent)` helper that opens a WebSocket and
+dispatches typed `ProgressEvent` messages. It is not yet present in the
+tree; the playground talks to its own in-browser estimator until the hosted
+API ships.
 
 `request<T>(path, init)` is intentionally minimal — no React Query / SWR. The
 hosted dashboard does need cache invalidation later; when that happens, wrap

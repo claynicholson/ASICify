@@ -2,19 +2,21 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASICify · Compiler for AI silicon",
+  title: "ASICify · An open compiler from PyTorch to silicon",
   description:
-    "Open-source compiler that turns trained PyTorch models into synthesizable Verilog, with area and cost estimates across eleven hardware targets.",
+    "ASICify takes a trained PyTorch model and emits synthesizable Verilog, a Cocotb testbench, and area-and-cost estimates across eleven hardware targets. MIT licensed. You run it. You keep the RTL.",
   openGraph: {
     title: "ASICify",
-    description: "Open-source compiler. PyTorch to synthesizable Verilog.",
+    description:
+      "An open compiler from PyTorch to silicon. You run it. You keep the RTL.",
     siteName: "ASICify",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "ASICify",
-    description: "Open-source compiler. PyTorch to synthesizable Verilog.",
+    description:
+      "An open compiler from PyTorch to silicon. You run it. You keep the RTL.",
   },
 };
 
@@ -24,16 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
+        <link rel="preconnect" href="https://rsms.me/" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
-          href="https://rsms.me/"
+          href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
         <link
           rel="stylesheet"
-          href="https://rsms.me/inter/inter.css"
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap"
         />
       </head>
       <body>{children}</body>

@@ -159,7 +159,7 @@ export function ConfigPanel({
 
       <a
         href="/docs/quickstart"
-        className="h-11 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] font-semibold text-sm hover:brightness-110 transition-[filter] flex items-center justify-center"
+        className="h-11 rounded-[4px] bg-[var(--color-accent)] text-[var(--color-accent-ink)] border border-[var(--color-accent-deep)] font-semibold text-sm hover:bg-[var(--color-accent-hover)] transition-colors flex items-center justify-center"
       >
         Compile via CLI →
       </a>

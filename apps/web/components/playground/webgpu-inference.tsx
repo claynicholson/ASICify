@@ -29,7 +29,7 @@ export function WebGPUInference() {
     progress: 0,
     message: "Click load to download the in-browser model (~80M params).",
   });
-  const [prompt, setPrompt] = useState("The compiler for AI silicon is");
+  const [prompt, setPrompt] = useState("The compiler for custom silicon is");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const generatorRef = useRef<unknown>(null);
@@ -142,7 +142,7 @@ export function WebGPUInference() {
       {!status.ready && !status.loading && (
         <button
           onClick={loadModel}
-          className="w-full h-9 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] font-medium text-sm hover:brightness-110"
+          className="w-full h-9 rounded-[6px] bg-[var(--color-accent)] text-[var(--color-accent-ink)] border border-[var(--color-accent-deep)] font-medium text-sm hover:bg-[var(--color-accent-hover)]"
         >
           Load model in browser (~80 MB, cached after first load)
         </button>
@@ -174,7 +174,7 @@ export function WebGPUInference() {
           <button
             onClick={generate}
             disabled={running}
-            className="mt-3 w-full h-9 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] font-medium text-sm hover:brightness-110 disabled:opacity-50"
+            className="mt-3 w-full h-9 rounded-[6px] bg-[var(--color-accent)] text-[var(--color-accent-ink)] border border-[var(--color-accent-deep)] font-medium text-sm hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
           >
             {running ? "Generating..." : "Generate"}
           </button>

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 
 /**
@@ -10,7 +11,23 @@ import path from "node:path";
  *   /docs/internals            → docs/internals/README.md  (folder index)
  */
 
-const DOCS_ROOT = path.resolve(process.cwd(), "..", "..", "docs");
+/** Resolve the docs root by trying both common cwd values (project root and apps/web). */
+function findDocsRoot(): string {
+  const candidates = [
+    path.resolve(process.cwd(), "docs"), // cwd = project root
+    path.resolve(process.cwd(), "..", "..", "docs"), // cwd = apps/web
+  ];
+  for (const c of candidates) {
+    try {
+      if (fsSync.statSync(c).isDirectory()) return c;
+    } catch {
+      // not present, try next
+    }
+  }
+  return candidates[0];
+}
+
+const DOCS_ROOT = findDocsRoot();
 
 /** Curated structure shown in the sidebar + index page. */
 export interface DocSection {
@@ -108,7 +125,10 @@ export async function getDoc(slug: string): Promise<DocContent | null> {
         label: meta.label,
         body,
         lastUpdated: stat.mtime,
-        sourcePath: path.relative(path.resolve(process.cwd(), "..", ".."), candidate),
+        // Repo-root-relative POSIX path, suitable for use in URLs.
+        sourcePath: path
+          .relative(path.dirname(DOCS_ROOT), candidate)
+          .replace(/\\/g, "/"),
       };
     } catch {
       // try next candidate

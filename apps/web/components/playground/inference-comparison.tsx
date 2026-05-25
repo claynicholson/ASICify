@@ -1,6 +1,6 @@
 "use client";
 
-const SAMPLE_PROMPT = "The future of AI inference will run on";
+const SAMPLE_PROMPT = "The future of model inference will run on";
 
 const ORIGINAL_OUTPUT =
   " custom silicon designed specifically for transformer workloads, with hardware optimized for sparse attention and low-precision arithmetic.";

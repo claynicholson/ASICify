@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
+import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "About · ASICify",
-  description: "An open-source compiler for AI silicon.",
+  description: "An open compiler from PyTorch to Verilog.",
 };
 
 export default function AboutPage() {
@@ -12,101 +13,100 @@ export default function AboutPage() {
     <>
       <Nav />
       <main className="mx-auto max-w-[760px] px-6 py-16">
-        <div className="text-[11px] uppercase tracking-[0.08em] text-[var(--color-text-tertiary)] font-medium mb-3">
+        <div className="eyebrow mb-3">About</div>
+        <h1 className="font-serif text-[clamp(2.5rem,5.5vw,3.5rem)] tracking-serif leading-[1.05]">
           About
-        </div>
-        <h1 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-          About this project
         </h1>
 
-        <div className="mt-8 space-y-6 text-[var(--color-text-secondary)] leading-relaxed">
+        <div className="mt-8 space-y-6 text-[var(--color-text-secondary)] leading-relaxed text-[17px]">
           <p>
-            ASICify is an open-source compiler that turns trained neural
-            networks into hardware-ready specifications. Submit a model and
-            get back compressed weights, synthesizable RTL with hardwired
-            multipliers, area estimates across foundry nodes, an FPGA
-            reference implementation, and a verified Cocotb testbench.
+            ASICify is an open compiler that turns trained PyTorch models into
+            hardware-ready specifications. It produces compressed weights,
+            synthesizable RTL with hardwired multipliers, area estimates
+            across foundry nodes, an FPGA reference implementation, and a
+            Cocotb testbench.
           </p>
           <p>
-            Custom AI silicon costs $5 to 30 million per tape-out and takes
-            6 to 18 months. Fabrication isn&apos;t the bottleneck. The
-            model-to-hardware translation is. Most chip companies and edge-AI
-            deployers do that translation by hand today, with specialist
-            engineers writing the same boilerplate over and over.
+            Custom silicon costs between $5 million and $30 million per
+            tape-out and takes six to eighteen months. The bottleneck is not
+            fabrication; the bottleneck is the translation from a trained
+            model to working hardware. Most chip teams do that translation by
+            hand, with specialist engineers writing the same boilerplate over
+            and over.
           </p>
           <p>
-            ASICify automates the boilerplate so people can focus on
-            cell-level and process-level engineering. Cadence and Synopsys
-            built EDA for general-purpose chips. ASICify targets one
-            workflow: turning a trained inference network into a
-            fixed-function accelerator.
+            ASICify automates the boilerplate. Cadence and Synopsys built EDA
+            tools for general-purpose chips, while ASICify targets one
+            workflow: turning a trained inference model into a fixed-function
+            accelerator.
+          </p>
+          <p>
+            The compiler is the product, and the artifacts belong to whoever
+            runs it. The supply chain is whoever the user already trusts. The
+            project is MIT licensed.
           </p>
         </div>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card label="License" body="MIT. Free to use, fork, modify, and ship in commercial products." />
-          <Card label="Hardware targets" body="Eleven supported, from SkyWater 130 to TSMC 7nm to Lattice and Xilinx FPGAs." />
-          <Card label="Status" body="Pre-1.0. The MVP spine is complete; real model parsing and validation are next." />
+          <Card
+            label="License"
+            body="MIT licensed, so you can use, fork, modify, and ship it."
+          />
+          <Card
+            label="Hardware targets"
+            body="Eleven targets: SkyWater 130, GF22FDX, TSMC 28 / 16 / 7, Lattice ECP5, CrossLink-NX, Xilinx Artix-7, Kria, TinyTapeout, and chipIgnite."
+          />
+          <Card
+            label="Status"
+            body="Version 0.1, pre-1.0. The compiler spine is complete."
+          />
         </div>
 
         <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
-          <h2 className="text-xl font-semibold tracking-tight-display mb-4">
+          <h2 className="font-serif text-[1.875rem] tracking-serif mb-4">
             Get involved
           </h2>
-          <p className="text-[var(--color-text-secondary)] leading-relaxed mb-6">
-            ASICify is community-built. The high-leverage areas right now:
-            adding hardware targets with cell-library citations, new
-            quantization formats (FP4, FP8, MXFP), new layer kinds (Mamba,
-            MoE), and refining cost-model parameters with foundry data
-            sheets.
+          <p className="text-[var(--color-text-secondary)] leading-relaxed mb-6 text-[16px]">
+            The highest-leverage contributions right now are adding hardware
+            targets with cell-library citations, adding new quantization
+            formats such as FP4, FP8, and MXFP, adding new layer kinds such
+            as Mamba and MoE, and refining cost-model parameters using
+            foundry data sheets.
           </p>
           <ul className="space-y-2 text-sm">
             <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
                 Source
               </span>
               <a
                 href="https://github.com/claynicholson/asicify"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
               >
                 github.com/claynicholson/asicify
               </a>
             </li>
             <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
                 Issues
               </span>
               <a
                 href="https://github.com/claynicholson/asicify/issues"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
               >
                 Bug reports and feature requests
               </a>
             </li>
             <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
-                Discuss
-              </span>
-              <a
-                href="https://github.com/claynicholson/asicify/discussions"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
-              >
-                GitHub Discussions for design questions
-              </a>
-            </li>
-            <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-xs uppercase tracking-[0.08em] mt-0.5 w-20 flex-shrink-0">
+              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
                 Extend
               </span>
               <Link
                 href="/docs/internals/extending"
-                className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
               >
                 Recipes for adding targets, primitives, and stages
               </Link>
@@ -114,32 +114,25 @@ export default function AboutPage() {
           </ul>
 
           <div className="mt-10 flex gap-3">
-            <Link
-              href="/playground"
-              className="inline-flex items-center justify-center h-9 px-4 rounded-[6px] bg-[var(--color-accent)] text-[#0A0B0E] text-sm font-medium hover:brightness-110"
-            >
-              Open the playground
-            </Link>
-            <Link
-              href="/docs"
-              className="inline-flex items-center justify-center h-9 px-4 rounded-[6px] border border-[var(--color-border-default)] text-sm font-medium hover:bg-[var(--color-bg-elevated)]"
-            >
-              Read the docs
-            </Link>
+            <Button asChild size="md">
+              <Link href="/playground">Open the playground</Link>
+            </Button>
+            <Button asChild variant="outline" size="md">
+              <Link href="/docs">Read the docs</Link>
+            </Button>
           </div>
         </div>
 
         <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
-          <h2 className="text-xl font-semibold tracking-tight-display mb-4">
+          <h2 className="font-serif text-[1.875rem] tracking-serif mb-4">
             Acknowledgements
           </h2>
-          <p className="text-[var(--color-text-secondary)] leading-relaxed text-sm">
-            ASICify stands on a lot of open-source work. Tri Dao and the
-            HazyResearch team for Monarch matrices. Matt Venn for
-            TinyTapeout. SkyWater and Efabless for the open-PDK movement.
-            The Yosys and nextpnr maintainers for the open synthesis flow.
-            The Cocotb authors for making hardware verification feel like
-            Python.
+          <p className="text-[var(--color-text-secondary)] leading-relaxed text-[15px]">
+            Thanks to Tri Dao and the HazyResearch team for Monarch matrices,
+            Matt Venn for TinyTapeout, SkyWater and Efabless for the open-PDK
+            movement, the Yosys and nextpnr maintainers for the open
+            synthesis flow, and the Cocotb authors for making hardware
+            verification feel like Python.
           </p>
         </div>
       </main>
@@ -150,11 +143,9 @@ export default function AboutPage() {
 
 function Card({ label, body }: { label: string; body: string }) {
   return (
-    <div className="rounded-[6px] border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] p-4">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-[var(--color-text-tertiary)] font-medium mb-2">
-        {label}
-      </div>
-      <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+    <div className="sticker rounded-[3px] p-4">
+      <div className="eyebrow mb-2">{label}</div>
+      <p className="text-[14px] text-[var(--color-text-secondary)] leading-relaxed">
         {body}
       </p>
     </div>

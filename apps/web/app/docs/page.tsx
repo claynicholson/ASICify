@@ -94,16 +94,6 @@ export default async function DocsIndexPage() {
               → File an issue
             </a>
           </li>
-          <li>
-            <a
-              href="https://github.com/claynicholson/asicify/discussions"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[var(--color-accent)]"
-            >
-              → GitHub Discussions
-            </a>
-          </li>
         </ul>
       </div>
     </div>

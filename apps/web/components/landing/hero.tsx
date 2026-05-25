@@ -1,49 +1,70 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { AlgorithmicArt } from "@/components/landing/algorithmic-art";
+import { SharpArrow } from "@/components/ornaments";
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-grid pointer-events-none" />
-      <div className="relative mx-auto max-w-[1200px] px-6 pt-24 pb-32">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)] px-3 py-1 mb-8">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] animate-pulse" />
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            v0.1 · open source on GitHub
-          </span>
-        </div>
+      <div className="absolute inset-0 bg-blueprint pointer-events-none" />
 
-        <h1 className="text-[clamp(2.5rem,6vw,3.5rem)] font-bold tracking-display leading-[1.05] max-w-3xl">
-          Compile PyTorch models to{" "}
-          <span className="text-[var(--color-accent)]">synthesizable Verilog.</span>
-        </h1>
+      <div className="relative mx-auto max-w-[1200px] px-6 pt-16 pb-24 md:pt-24 md:pb-32">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+          {/* Left: copy */}
+          <div className="lg:col-span-7">
+            <div className="mb-7">
+              <span className="stamp">v0.1 · MIT · open source</span>
+            </div>
 
-        <p className="mt-6 max-w-2xl text-[18px] text-[var(--color-text-secondary)] leading-relaxed">
-          Generates RTL with hardwired weights, area and cost estimates across
-          eleven hardware targets, and a Cocotb testbench. Drag a slider in the
-          playground to see what your model looks like as silicon.
-        </p>
+            <h1 className="font-serif text-[clamp(3rem,6.8vw,5rem)] leading-[1.02] tracking-serif text-[var(--color-text-primary)]">
+              An open compiler from PyTorch to Verilog
+            </h1>
 
-        <div className="mt-8 flex items-center gap-3">
-          <Button asChild size="lg">
-            <Link href="/playground">Open the playground</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a
-              href="https://github.com/claynicholson/asicify"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Source on GitHub
-            </a>
-          </Button>
-        </div>
+            <p className="mt-7 max-w-2xl text-[18px] md:text-[19px] text-[var(--color-text-secondary)] leading-[1.55]">
+              ASICify takes a trained PyTorch model and emits synthesizable
+              Verilog, a Cocotb testbench, and area-and-cost estimates across
+              eleven hardware targets. It is MIT licensed, and the source is
+              available on GitHub.
+            </p>
 
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl">
-          <Stat label="Hardware targets" value="11" />
-          <Stat label="Foundry nodes" value="5" />
-          <Stat label="Quantization modes" value="5" />
-          <Stat label="License" value="MIT" />
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg">
+                <Link href="/playground">
+                  Open the playground
+                  <SharpArrow className="w-5 h-3 text-[var(--color-accent-ink)]" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <a
+                  href="https://github.com/claynicholson/asicify"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Read the source
+                </a>
+              </Button>
+            </div>
+
+            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 max-w-[520px]">
+              <Stat label="hardware targets" value="11" />
+              <Stat label="foundry nodes" value="5" />
+              <Stat label="quant modes" value="5" />
+              <Stat label="license" value="MIT" />
+            </div>
+          </div>
+
+          {/* Right: abstract algorithmic art */}
+          <div className="lg:col-span-5 relative wobble-in">
+            <div className="relative">
+              <div className="absolute -inset-3 sticker rounded-[3px] rotate-[0.6deg]" />
+              <div className="relative p-4">
+                <AlgorithmicArt className="w-full h-auto" />
+              </div>
+              <p className="mt-3 text-center font-serif italic text-[var(--color-text-tertiary)] text-[15px]">
+                fig. 1. seed 7.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -52,11 +73,11 @@ export function Hero() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-l border-[var(--color-border-default)] pl-4">
-      <div className="font-mono text-2xl font-semibold tracking-tight-display">
+    <div className="border-l-2 border-[var(--color-border-default)] pl-3">
+      <div className="font-mono text-[26px] font-semibold tracking-tight-display text-[var(--color-text-primary)]">
         {value}
       </div>
-      <div className="mt-1 text-xs uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+      <div className="mt-1 text-[10.5px] uppercase tracking-[0.14em] text-[var(--color-text-tertiary)] font-medium">
         {label}
       </div>
     </div>
