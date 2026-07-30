@@ -41,6 +41,7 @@ class SparsityConfig(BaseModel):
 class DecompositionConfig(BaseModel):
     type: DecompositionType = "none"
     rank: int | None = None
+    num_blocks: int | None = Field(None, ge=2)
 
 
 class CompressionConfig(BaseModel):

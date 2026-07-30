@@ -54,6 +54,7 @@ class SparsityConfig:
 class DecompositionConfig:
     type: DecompositionType = "none"
     rank: int | None = None
+    num_blocks: int | None = None  # monarch/butterfly; None = auto (~sqrt of min dim)
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 Everything verifiable runs in pytest. As of writing, **80 tests in 4.6
 seconds** on CPU. The test suite is the canonical source of truth for
-"does the compiler still work" — CI runs it on every push.
+"does the compiler still work"; CI runs it on every push.
 
 ## Running
 
@@ -52,8 +52,8 @@ apps/worker/tests/
   weights.
 - Zero rows are handled without divide-by-zero.
 - The bit-exact forward `linear_int8_forward` matches a hand-computed
-  version of the same fixed-point arithmetic (proves the kernel
-  formula is what we say it is).
+  version of the same fixed-point arithmetic (confirms the kernel
+  implements the documented formula).
 
 ### `test_pack.py`
 
@@ -136,7 +136,7 @@ this is the test that catches drift.
 - Back-compat `{"module": ...}` without `"type"` still works.
 - Unknown types raise a clear ValueError.
 - `{"type": "checkpoint", "path": ...}` loads a saved nn.Module.
-- The HF loader reports availability correctly and raises a helpful
+- The HF loader reports availability correctly and raises a
   RuntimeError when the `hosted` extra isn't installed.
 
 ### `test_end_to_end.py`
@@ -180,7 +180,7 @@ Conventions:
 - Use `pytest.parametrize` to run the same logic across all
   precisions (see `test_quantize_multi.py`).
 - For end-to-end tests, use `tmp_path` fixture for the rendered
-  package — pytest cleans it up.
+  package; pytest cleans it up.
 - Don't test internals of internals; test contracts. If you find
   yourself patching private functions, the test is too tight.
 
@@ -234,23 +234,29 @@ Useful for spot-checking after a refactor.
 | Job | Runs | What |
 |-----|------|------|
 | `worker-tests` | ubuntu-latest | `uv sync --extra dev && uv run pytest -q` |
-| `rtl-lint-and-synth` | ubuntu-latest | Generate the demo package + verilator lint + yosys synth-check |
+| `rtl-lint-synth-and-sim` | ubuntu-latest | Generate the demo package + verilator lint + yosys synth-check + cocotb simulation |
 | `web-build` | ubuntu-latest | pnpm install + typecheck + build + Docker build |
 
-The `rtl-lint-and-synth` job catches regressions where the templates
+The `rtl-lint-synth-and-sim` job catches regressions where the templates
 emit syntactically-valid Python but no-longer-synthesizable Verilog.
 Verilator's lint is fast; yosys's `read_verilog -sv ... ; hierarchy ;
 proc ; flatten ; stat` exercises the full elaboration without writing
 a netlist.
 
+The final step of that job runs `tests/test_simulation.py`, which
+generates a package into a temp dir and shells out to its `make sim`
+target — cocotb driving Verilator against the generated `tb_top.py`.
+Locally the test skips when verilator/cocotb/make aren't on PATH; in CI
+`ASICIFY_REQUIRE_SIM=1` turns a missing tool into a hard failure so a
+broken install can't silently go green. The test also parses the JUnit
+`results.xml` because cocotb's Makefile flow doesn't always propagate
+test failures into the exit code. This closes the bit-exactness chain:
+`kernel ↔ reference.py` (pytest) and `reference.py ↔ RTL` (cocotb).
+
 ## Coverage gaps (known)
 
-Tests we don't have yet that we should:
+Missing tests:
 
-- **Verilator simulation in pytest**. Right now the bit-exact test is
-  Python kernel ↔ Python reference. Adding `pytest-cocotb` or
-  shelling out to `make sim` from a test would cover Verilog-level
-  correctness too.
 - **HF loader against a real small model**. The smoke test in
   `test_loader.py` only covers dispatch, not actual model loading.
   When the `hosted` extra is installed in CI, we should add a test
@@ -262,5 +268,5 @@ Tests we don't have yet that we should:
   smoke test that requests a PDF and asserts the response starts
   with `%PDF`.
 
-These are tracked but not blocking — the core compiler invariants are
+These are tracked but not blocking; the core compiler invariants are
 covered.

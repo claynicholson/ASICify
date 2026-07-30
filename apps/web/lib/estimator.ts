@@ -95,8 +95,10 @@ export function effectiveParams(params: number, config: CompressionConfig): numb
     p *= 1 - config.sparsity.ratio;
   }
   if (config.decomposition.type === "monarch" || config.decomposition.type === "butterfly") {
-    // Monarch/butterfly factorization compresses dense layers by O(sqrt(n))
-    p *= 0.35;
+    // Nonzero params are k*(in+out) vs in*out dense; with the mean-dim-512
+    // convention below this is 2k/512. Default k ~ sqrt(512).
+    const k = config.decomposition.num_blocks ?? 23;
+    p *= Math.min(1.0, (k * 2) / 512);
   } else if (config.decomposition.type === "low_rank") {
     const rank = config.decomposition.rank ?? 64;
     // crude: assume mean dim ~512

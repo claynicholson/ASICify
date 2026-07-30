@@ -96,6 +96,12 @@ module layer_{{ layer_view.symbol }} (
                 acc[o] <= BIAS_Q_{{ layer_view.symbol }}[o];
             end
         end else if (!streaming) begin
+            // Drop out_valid once the final streamed word has been consumed;
+            // otherwise it sticks high with stale data and the next stage
+            // reads phantom inputs between bursts.
+            if (out_valid && out_ready) begin
+                out_valid <= 1'b0;
+            end
             if (in_valid) begin
                 for (o = 0; o < OUT_FEATURES; o = o + 1) begin
                     w_unpacked = unpack_w(o, in_idx);
@@ -112,7 +118,10 @@ module layer_{{ layer_view.symbol }} (
             end
         end else begin
             if (!out_valid || out_ready) begin
-                product  = $signed({32'sd0, acc[out_idx]}) *
+                // acc must sign-extend to 64 bits: both operands signed, the
+                // 64-bit assignment context extends them. A {32'sd0, acc}
+                // concat would zero-extend and corrupt negative accumulators.
+                product  = $signed(acc[out_idx]) *
                            $signed({1'b0, SCALE_Q31_{{ layer_view.symbol }}[out_idx]});
                 rescaled = product >>> 31;
                 out_data  <= rescaled[31:0];

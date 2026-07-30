@@ -180,6 +180,7 @@ def cmd_compile(args: argparse.Namespace) -> int:
         decomposition=DecompositionConfig(
             type=args.decomposition,
             rank=args.rank,
+            num_blocks=args.num_blocks,
         ),
     )
 
@@ -285,6 +286,8 @@ def main() -> int:
                       choices=["none", "low_rank", "monarch", "butterfly"])
     comp.add_argument("--rank", type=int, default=64,
                       help="Rank for low-rank decomposition (default: 64)")
+    comp.add_argument("--num-blocks", type=int, default=None,
+                      help="Block count for monarch/butterfly (default: auto, ~sqrt of min dim)")
     comp.add_argument("--target", "-t", default="tsmc28",
                       help="Comma-separated hardware targets for estimation")
     comp.add_argument("--task", default="language_modeling",

@@ -1,15 +1,17 @@
 # Roadmap
 
-Honest "what's shipped vs what's next" — updated as work lands. If something
-on this page contradicts something elsewhere in the repo, this page is the
-source of truth.
+What's shipped vs what's next, updated as work lands. If something on this
+page contradicts something elsewhere in the repo, this page is the source
+of truth.
 
 ## Shipped and verified
 
 The compiler core works end-to-end across four quantization precisions. The
-bit-exactness contract (`kernel forward == generated reference.py`) is
-locked in by 80 pytest tests in
-[`apps/worker/tests/`](../apps/worker/tests/), running in ~5 seconds on CPU.
+bit-exactness contract (`kernel forward == generated reference.py == RTL`)
+is locked in by 90 pytest tests in
+[`apps/worker/tests/`](../apps/worker/tests/): the fast ones run in ~7
+seconds on CPU; the cocotb/Verilator simulation test runs in CI on every
+push.
 
 ### Compiler
 
@@ -40,7 +42,17 @@ locked in by 80 pytest tests in
       tensors and inserts two synthetic Linear layers (B then A) into
       the graph. Pipeline metadata records reconstruction error per
       decomposed layer.
-- [x] HuggingFace model loader (in `hosted` extra) — module / checkpoint /
+- [x] **Monarch and butterfly decomposition.** Real blockwise rank-1
+      SVD projection onto the Monarch class (Dao et al. 2022), factors
+      materialized as two dense Linears with structured zeros and the
+      permutation folded into row ordering. Butterfly is the
+      power-of-two-blocks flavor
+      (two factors, one intermediate requantization, instead of log n
+      butterfly stages), so quantize, pack, and RTL render are untouched.
+      `--num-blocks` on the CLI; auto ≈ √min-dim
+      snapped to a divisor of gcd(in, out). Estimators use real nonzero
+      counts instead of the old hardcoded 0.35x guess.
+- [x] HuggingFace model loader (in `hosted` extra): module / checkpoint /
       huggingface dispatch
 - [x] Real activation-MSE validation: dequantize, run, compare per-layer
       activations + end-to-end cosine similarity, ordering across precisions
@@ -61,6 +73,12 @@ locked in by 80 pytest tests in
 - [x] Cocotb testbench (`tb_top.py`) with 8-trial random vector check
 - [x] `Makefile` with `sim` / `lint` / `synth-yosys` / `synth-vivado` targets
       that detect missing tools and print install hints
+- [x] **Cocotb simulation in the test loop.** `tests/test_simulation.py`
+      generates a package and runs its `make sim` (Verilator + cocotb)
+      as a real pytest: skipped locally without the tools, required in
+      CI via `ASICIFY_REQUIRE_SIM=1` so a broken tool install can't go
+      green. The bit-exactness chain is now
+      `kernel ↔ reference.py ↔ RTL`, machine-checked on every push.
 
 ### Tooling
 
@@ -82,12 +100,8 @@ locked in by 80 pytest tests in
       with WASM fallback (DistilGPT-2 by default, ~80MB cached after first
       load)
 
-## Partial — wired but not exhaustive
+## Partial: wired but not exhaustive
 
-- [~] **Monarch and butterfly decomposition**. The pipeline records
-      intent for these and emits a `_decomp_pending` metadata key, but
-      the actual block-diagonal factorization kernels aren't written.
-      Low-rank SVD truncation is fully wired (see "Shipped" above).
 - [~] **Attention KV cache wiring**. The `kv_cache.v` and `softmax.v`
       modules are emitted in every package, and the
       `attention_block.v.j2` wires them in for single-token attention.
@@ -101,8 +115,7 @@ locked in by 80 pytest tests in
       account credentials.
 - [ ] **End-to-end synthesis verification on real ECP5 hardware**. CI
       runs `verilator --lint-only` and a Yosys synth-check, but no
-      bitstream is flashed to a board. The first time we wire this is
-      worth a blog post.
+      bitstream is flashed to a board.
 - [ ] **Real perplexity validation against language data**. The
       validator works against random Gaussian inputs; for token-input
       models, you need a dataset. The hook is `validate_with_data`.
@@ -119,26 +132,49 @@ locked in by 80 pytest tests in
 
 In priority order:
 
-1. **Wire Verilator into the test loop.** The cocotb testbench is
-   generated; running it from CI takes one extra job step. This
-   upgrades the bit-exactness chain from `kernel ↔ reference.py` to
-   `kernel ↔ reference.py ↔ RTL`.
-2. **HF attention auto-detection.** Today HF transformers compile
-   correctly but render as a flat list of projections. Recognizing the
-   attention block as a unit unlocks the structural template and the
-   KV cache wiring.
-3. **First real ECP5 bitstream.** Pick a small model (DistilBERT
+1. **Multi-token attention with real KV-cache rotation.** The last
+   `[~]` item above. `kv_cache.v` is a real BRAM and single-token
+   attention works; the template iteration that rotates the cache
+   across a token sequence unlocks honest autoregressive decode.
+2. **First real ECP5 bitstream.** Pick a small model (DistilBERT
    tiny), compile to int8, run yosys + nextpnr-ecp5 + ecppack, flash
-   to a $35 board, post a tweet with the build log. This is the
-   credibility moment.
-4. **Public API deployment.** Once the worker pipeline above is
-   demonstrably real, deploying the hosted version becomes a story
-   worth telling.
+   it to a $35 board, and publish the build log.
+3. **Real perplexity validation.** The validator runs against random
+   Gaussian inputs today; wire `validate_with_data` to a real token
+   dataset (wikitext-2 is the obvious start) so compression reports
+   carry perplexity deltas, not just cosine similarity.
+4. **Public API deployment.** The Dockerfiles and Modal app are
+   committed and the pipeline is verified end-to-end; deploying the
+   hosted version is now unblocked.
 
 ## Long-tail
 
 Real but lower priority until the above lands:
 
+### Compression quality
+- **Static activation calibration**: feed a small calibration set
+  through the float model and derive per-layer activation ranges,
+  replacing the weight-only assumptions in quantization + validation
+- **Per-group quantization (GPTQ-style)**: group-wise scales within a
+  row, plus error-compensating rounding order; better int4 accuracy on
+  transformer weights
+- **Mixed-precision assignment**: search precision per layer against
+  an area budget (the estimator is already fast enough to be the inner
+  loop of that search)
+- **Hardware-aware fine-tuning**: the existing "Not yet started" item;
+  a short straight-through-estimator retraining run, Modal-backed
+
+### Hardware pipeline
+- **CI area regression tracking**: record Yosys `stat` cell counts for
+  the demo package on every push; fail on unexplained growth the same
+  way perf suites fail on latency regressions
+- **TinyTapeout tile template variant**: sky130 already works; add
+  their pinout and area-limit packaging
+- **Toggle-rate power estimation**: Verilator can dump per-net
+  activity from the cocotb runs in CI; fold real toggle rates into the
+  power model instead of the static estimate
+
+### Reach
 - WebGPU inference for *any* HF model (currently fixed to DistilGPT-2)
 - Diffusion / Mamba primitive support
 - Speculative decoding hardware partitioning

@@ -29,8 +29,8 @@ jobs:
         working-directory: apps/worker
         run: uv run pytest -q
 
-  rtl-lint-and-synth:
-    name: Lint + synth check on a generated package
+  rtl-lint-synth-and-sim:
+    name: Lint + synth + cocotb sim on a generated package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,8 @@ jobs:
       - name: Install verilator and yosys
         run: |
           sudo apt-get update
-          sudo apt-get install -y verilator yosys
+          sudo apt-get install -y verilator yosys make
+          verilator --version
 
       - name: Sync worker dependencies
         working-directory: apps/worker
@@ -67,6 +68,15 @@ jobs:
                     proc; \
                     flatten; \
                     stat"
+
+      # Closes the bit-exactness chain: pytest proves kernel == reference.py,
+      # this proves reference.py == RTL (cocotb drives Verilator through the
+      # generated Makefile's own `sim` target).
+      - name: Simulate with cocotb (RTL == reference.py)
+        working-directory: apps/worker
+        env:
+          ASICIFY_REQUIRE_SIM: "1"
+        run: uv run pytest tests/test_simulation.py -v -m sim
 
   web-build:
     name: Web build + Docker image

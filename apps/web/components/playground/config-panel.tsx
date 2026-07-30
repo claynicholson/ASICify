@@ -112,8 +112,8 @@ export function ConfigPanel({
 
       <div>
         <SectionLabel>Decomposition</SectionLabel>
-        <div className="grid grid-cols-3 gap-1">
-          {(["none", "monarch", "butterfly"] as const).map((type) => (
+        <div className="grid grid-cols-2 gap-1">
+          {(["none", "low_rank", "monarch", "butterfly"] as const).map((type) => (
             <button
               key={type}
               onClick={() =>
@@ -131,9 +131,11 @@ export function ConfigPanel({
             >
               {type === "none"
                 ? "None"
-                : type === "monarch"
-                  ? "Monarch"
-                  : "Butterfly"}
+                : type === "low_rank"
+                  ? "Low-rank"
+                  : type === "monarch"
+                    ? "Monarch"
+                    : "Butterfly"}
             </button>
           ))}
         </div>

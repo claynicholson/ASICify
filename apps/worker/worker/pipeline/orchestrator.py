@@ -32,6 +32,7 @@ def _cfg_from_dict(d: dict[str, Any]) -> CompressionConfig:
         decomposition=DecompositionConfig(
             type=d.get("decomposition", {}).get("type", "none"),
             rank=d.get("decomposition", {}).get("rank"),
+            num_blocks=d.get("decomposition", {}).get("num_blocks"),
         ),
         fine_tune=d.get("fine_tune", False),
         fine_tune_steps=d.get("fine_tune_steps", 1000),

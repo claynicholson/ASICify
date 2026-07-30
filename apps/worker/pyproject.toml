@@ -29,6 +29,14 @@ dev = [
     "mypy>=1.13.0",
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    # RTL simulation: the generated package's `make sim` target drives
+    # Verilator through cocotb. Pinned <2.0 (2.x changed the Makefile flow).
+    "cocotb>=1.9,<2.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "sim: runs the generated RTL through Verilator via cocotb (needs verilator + make on PATH)",
 ]
 
 [project.scripts]

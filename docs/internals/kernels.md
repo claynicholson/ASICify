@@ -15,7 +15,7 @@ apps/worker/worker/kernels/
 ├── quantize.py        INT8 / INT4 / ternary / binary / FP16 quantization + bit-exact forward
 ├── pack.py            Tensor -> SystemVerilog `localparam` literal strings (5 formats)
 ├── sparsity.py        2:4, 4:8, block-16, unstructured magnitude pruning
-├── decompose.py       Low-rank SVD truncation (W ≈ A @ B)
+├── decompose.py       Low-rank SVD truncation + Monarch/butterfly blockwise projection
 ├── layers.py          LayerNorm, Embedding, QuantizedAttention dataclass
 └── attention.py       Integer softmax with LUT-based exp + reference attention
 ```
@@ -26,7 +26,7 @@ mapping. This is what lets pytest run all 80 tests in 4.6 seconds.
 
 ## The bit-exactness contract
 
-The single most important invariant in the entire compiler: the kernel
+The most important invariant in the compiler: the kernel
 forward pass and the generated `reference.py` must produce identical
 `int32` output on identical input. The Verilog is verified against the
 reference, and the reference is verified against the kernel, so
@@ -38,7 +38,7 @@ forward, you must regenerate the matching template arm and rerun
 `tests/test_quantize_multi.py` and `tests/test_end_to_end.py`. Both
 suites run in under 5 seconds.
 
-## `quantize.py` — INT8 / INT4 / ternary / binary / FP16
+## `quantize.py`: INT8 / INT4 / ternary / binary / FP16
 
 ### `QuantizedLinear` dataclass
 
@@ -63,7 +63,7 @@ class QuantizedLinear:
 ```
 
 Why one dataclass for all precisions? Because the *forward arithmetic*
-is identical — the only thing that changes is how the int8 tensor gets
+is identical; the only thing that changes is how the int8 tensor gets
 **packed** into Verilog literals. The pack module handles that.
 
 ### Quantizer functions
@@ -79,9 +79,9 @@ Plus a dispatcher: `quantize_linear(W, b, precision)`.
 
 The ternary threshold uses the classic `0.7 * mean(|W|)` heuristic
 (Li & Liu 2016). It minimizes L2 reconstruction error for Gaussian
-weights — don't change without a good reason.
+weights. Don't change it without a good reason.
 
-### `linear_int8_forward(x, q)` — the bit-exact reference
+### `linear_int8_forward(x, q)`: the bit-exact reference
 
 ```python
 def linear_int8_forward(x, q):
@@ -121,7 +121,7 @@ The full FP4 pattern is the most likely next addition; it would store
 weights as 4-bit floats with shared exponents and need a small LUT in
 the multiplier arm.
 
-## `pack.py` — Tensor → SystemVerilog literals
+## `pack.py`: Tensor → SystemVerilog literals
 
 Each precision packs differently to match what the multiplier expects:
 
@@ -140,25 +140,25 @@ Plus three constant tables, all precision-independent:
 | `SCALE_Q31_<sym>` | `'{32'd<n>, ...}'` (Q0.31 unsigned) | rescale multiplier |
 | `BIAS_Q_<sym>`    | `'{32'sd<n>, ...}'` (signed int32) | accumulator initial value |
 
-`bias_q = round(bias_float / scale)` — the bias gets converted *into
+`bias_q = round(bias_float / scale)`: the bias gets converted *into
 accumulator units* so it can be added before the rescale shift. This
 saves a separate adder in hardware.
 
-`scale_q31 = round(scale_float * 2^31).clamp(0, 2^31-1)` — Q0.31
+`scale_q31 = round(scale_float * 2^31).clamp(0, 2^31-1)`: Q0.31
 unsigned. Range covers typical per-row scales (10⁻⁴ to 10⁻²) with
 plenty of resolution.
 
 Functions:
 
-- `pack_layer(symbol, q: QuantizedLinear) -> str` — emits all three
+- `pack_layer(symbol, q: QuantizedLinear) -> str`: emits all three
   declarations. **Use this**, not the per-precision functions.
 - `int8_array_to_sv`, `int4_array_to_sv`, `ternary_array_to_sv`,
-  `binary_array_to_sv` — per-precision weight emitters.
-- `pack_layernorm(symbol, qln) -> str` — emits gamma_q15 / beta_q15 /
+  `binary_array_to_sv`: per-precision weight emitters.
+- `pack_layernorm(symbol, qln) -> str`: emits gamma_q15 / beta_q15 /
   eps_q15 for a `QuantizedLayerNorm`.
-- `pack_embedding(symbol, qe) -> str` — emits the int8 lookup table.
+- `pack_embedding(symbol, qe) -> str`: emits the int8 lookup table.
 
-## `sparsity.py` — magnitude pruning
+## `sparsity.py`: magnitude pruning
 
 Runs **before** quantization (in `worker/pipeline/sparsity.py`). The
 pruned weights become exact zeros in the float tensor, which then
@@ -181,7 +181,7 @@ represent zero. The pipeline-level wrapper in
 and short-circuits. There's a test for this
 (`test_sparsity.test_binary_skips_sparsity`).
 
-## `decompose.py` — low-rank SVD truncation
+## `decompose.py`: low-rank SVD truncation
 
 Replaces a `Linear(in, out)` with two smaller Linears: `Linear_B(in, r)`
 followed by `Linear_A(r, out)`. The pipeline does this *before*
@@ -212,10 +212,34 @@ The pipeline replaces the original layer name with `<name>.b` and
 `graph.metadata["_decomp_info"]`. The downstream pack and template
 machinery treat the two factors as ordinary Linear layers.
 
-Monarch and butterfly factorizations are placeholders: the pipeline
-records intent in `_decomp_pending` but does not yet modify weights.
+### Monarch and butterfly
 
-## `layers.py` — LayerNorm and Embedding
+`monarch_decompose(W, b, n_blocks)` projects W onto the Monarch class
+(Dao et al. 2022): view W as a `k x k` grid of blocks and replace each
+block with its best rank-1 approximation (independent per-block SVDs,
+which is the optimal projection onto that class). The same `sqrt(S)`
+energy split keeps both factors quantization-friendly.
+
+The two factors are *materialized as dense matrices with structured
+zeros* (density `1/k` each) and the fixed Monarch permutation is folded
+into the row ordering of the B factor. That means no permutation module
+in RTL: the pipeline inserts plain `<name>.b` / `<name>.a` Linear layers
+exactly like low-rank, and zeros quantize exactly to zero downstream.
+`param_count` on the synthetic layers counts nonzeros (`k*in` and
+`k*out`), so area estimates stay honest.
+
+Butterfly is realized as the Monarch projection with a power-of-two
+block count: the product of the two halves of a radix-2 butterfly chain
+lands in the Monarch class, and collapsing to two factors costs only a
+single intermediate int8 requantization instead of one per butterfly
+stage.
+
+`auto_n_blocks(in, out, requested, power_of_two)` picks `k`: target is
+the request or `round(sqrt(min dim))`, snapped down to a divisor of
+`gcd(in, out)`; returns `None` (skip the layer) when no `k >= 2` fits or
+the decomposition would not save parameters.
+
+## `layers.py`: LayerNorm and Embedding
 
 ### `QuantizedLayerNorm`
 
@@ -243,7 +267,7 @@ bit-exact reference (used in `tests/test_layers.py`).
 @dataclass
 class QuantizedEmbedding:
     table_int8: torch.Tensor  # (vocab, dim), int8
-    scale: torch.Tensor       # (dim,), float32 — per-column scale
+    scale: torch.Tensor       # (dim,), float32, per-column scale
     vocab_size: int
     embedding_dim: int
 ```
@@ -276,11 +300,11 @@ softmax LUT is a global constant emitted once into `weights.vh`.
 
 The current parser (in `worker/pipeline/parse.py`) does **not**
 auto-detect HF attention blocks and group them into a
-`QuantizedAttention`. That's the next-largest piece of work. For now
+`QuantizedAttention`. That is the next-largest piece of work. For now
 the projections render as separate Linear layers, which is correct but
 loses the structural relationship.
 
-## `attention.py` — softmax and reference attention
+## `attention.py`: softmax and reference attention
 
 ### `build_softmax_lut(input_bits=8, output_q=15) -> int32 tensor`
 

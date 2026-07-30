@@ -46,6 +46,8 @@ export interface SparsityConfig {
 export interface DecompositionConfig {
   type: DecompositionType;
   rank?: number;
+  /** Block count for monarch/butterfly; omit for auto (~sqrt of min dim). */
+  num_blocks?: number;
 }
 
 export interface CompressionConfig {

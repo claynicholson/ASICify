@@ -65,11 +65,23 @@ def estimate_area(
 
 
 def _effective_param_count(graph: ModelGraph, config: CompressionConfig) -> int:
+    # If the decomposition stage already ran, layer param_counts are exact
+    # (nonzero counts for the synthetic factor layers) — sum those instead
+    # of applying a heuristic multiplier on the stale total.
+    if config.decomposition.type != "none" and "_decomp_info" in graph.metadata:
+        p = float(sum(layer.param_count for layer in graph.layers))
+        if config.sparsity.type != "none":
+            p *= 1 - config.sparsity.ratio
+        return int(p)
+
     p = float(graph.total_params)
     if config.sparsity.type != "none":
         p *= 1 - config.sparsity.ratio
     if config.decomposition.type in ("monarch", "butterfly"):
-        p *= 0.35
+        # Nonzero params are k*(in+out) vs in*out dense; with the mean-dim-512
+        # convention used by the low_rank branch this is 2k/512.
+        k = config.decomposition.num_blocks or 23  # ~sqrt(512)
+        p *= min(1.0, (k * 2) / 512)
     elif config.decomposition.type == "low_rank":
         rank = config.decomposition.rank or 64
         p *= min(1.0, (rank * 2) / 512)
