@@ -1,12 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
   <title>ASICify</title>
   <!-- Die substrate -->
-  <rect width="16" height="16" rx="3" fill="#0A0B0E"/>
-  <!-- Corner registration marks (silicon fiducials) -->
-  <rect x="2"  y="2"  width="2" height="2" rx="0.5" fill="#1E2A3D"/>
-  <rect x="12" y="2"  width="2" height="2" rx="0.5" fill="#1E2A3D"/>
-  <rect x="2"  y="12" width="2" height="2" rx="0.5" fill="#1E2A3D"/>
-  <rect x="12" y="12" width="2" height="2" rx="0.5" fill="#1E2A3D"/>
-  <!-- Center transistor bar (the | in ASIC|fy) -->
-  <rect x="7"  y="2"  width="2" height="12" rx="0.5" fill="#5B8FF9"/>
+  <rect width="16" height="16" rx="2" fill="#241f1a"/>
+  <!-- Package outline -->
+  <rect x="3" y="3" width="10" height="10" fill="none" stroke="#e8e2d8" stroke-width="1"/>
+  <!-- Copper die center -->
+  <rect x="6" y="6" width="4" height="4" fill="#d24e18"/>
 </svg>

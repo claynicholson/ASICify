@@ -2,9 +2,9 @@
 
 Naming, formatting, structure. The rules we hold ourselves to.
 
-These exist for one reason: when the codebase is consistent, you can read
-unfamiliar parts of it as fast as the parts you wrote. Inconsistency taxes
-every future contributor.
+When the codebase is consistent, you can read unfamiliar parts of it as
+fast as the parts you wrote. Inconsistency taxes every future
+contributor.
 
 ## Languages and tools
 
@@ -92,17 +92,17 @@ import { ConfigPanel } from "./config-panel";
 
 Avoid relative imports like `../../components/ui/button`. Use `@/` instead.
 
-## Shared types — three places, one source of truth
+## Shared types: three places, one source of truth
 
 The `CompressionConfig`, `Quantization`, etc. live in three files:
 
-- TypeScript: `packages/shared/src/types.ts` — **canonical**
+- TypeScript: `packages/shared/src/types.ts` (**canonical**)
 - Pydantic: `apps/api/app/schemas.py`
 - Dataclass: `apps/worker/worker/types.py`
 
 Rule: **change TypeScript first**, then propagate. Code-review checklist
 includes "did all three move together?". The duplication is annoying but
-honest — it's the price of not having Python-TS interop tooling, and it
+honest: it's the price of not having Python-TS interop tooling, and it
 forces you to think about wire formats.
 
 When sync drifts, the Pydantic schema is what actually validates the wire,
@@ -125,7 +125,7 @@ so the API will reject malformed payloads. That's a feature.
 - `strict: true`. No `any` without a comment justifying it.
 - `interface` for object shapes, `type` for unions and aliases.
 - Prefer `unknown` over `any` when you really don't know.
-- Don't use `React.FC` — write the prop type and use a function declaration:
+- Don't use `React.FC`; write the prop type and use a function declaration:
 
 ```ts
 function Hero({ title }: { title: string }) { … }
@@ -143,7 +143,7 @@ Comment when:
 
 - The *why* isn't obvious. ("This 1.5× routing overhead is empirical for
   digital-only designs; mixed-signal needs more.")
-- A surprising constraint exists. ("Ordering matters here — Job row must
+- A surprising constraint exists. ("Ordering matters here: Job row must
   exist before the worker can BLPOP.")
 - A spec or paper is the source of truth. Cite it.
 - A decision was costly to make and is non-obvious. ("Using JSON instead
@@ -234,7 +234,7 @@ update this section.
   default export.
 - Props destructured at the function signature, not inside the body.
 - Avoid `useEffect` for derivations. Compute in render or use `useMemo`.
-- Don't fetch in `useEffect` — use server components or React Query.
+- Don't fetch in `useEffect`; use server components or React Query.
 
 ## State management
 

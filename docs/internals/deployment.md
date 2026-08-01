@@ -21,30 +21,137 @@ Plus shared infra:
 | Object storage | Cloudflare R2 | S3-compatible, no egress fees |
 | Auth | Clerk | JWT issuance + management |
 
-## Web app (already deployable)
+## Web app
 
-See [docs/deployment.md](../deployment.md) for the user-facing version.
-Recap:
+The web app ships as a single Docker image: a Next.js standalone server
+plus the markdown content from `docs/`. No database, no Redis, no other
+external dependencies. The playground runs in the browser and the docs
+are baked into the image.
+
+### Build and run
+
+From the repo root:
 
 ```bash
 docker build -t asicify/web .
 docker run --rm -p 3000:3000 asicify/web
 ```
 
-Image is ~340 MB, cold-starts in ~150ms. The image is fully self-contained
-(markdown docs are baked in, the playground is client-only). No env vars
-required.
+First build takes around 60 to 90 seconds; subsequent builds reuse the
+layer cache for `pnpm install` unless `pnpm-lock.yaml` changed. The image
+runs as a non-root user, listens on `0.0.0.0:3000`, and reaps signals via
+`tini`.
 
-To deploy on Fly.io: `fly launch --no-deploy` once, then `fly deploy`.
-A `fly.toml` for the web app would mirror the API's:
+The Dockerfile uses three stages:
+
+1. **`deps`**: installs workspace dependencies. Cached on `pnpm-lock.yaml`.
+2. **`builder`**: runs `pnpm --filter @asicify/web build`, producing the
+   Next.js standalone bundle.
+3. **`runner`**: copies the standalone server, the static assets, and the
+   `docs/` directory into a slim `node:22-alpine` image. No source code
+   in the final layer.
+
+The final image is a few hundred MB; most of that is the Node runtime.
+
+### Runtime environment variables
+
+| Variable    | Default      | Purpose                                |
+| ----------- | ------------ | -------------------------------------- |
+| `PORT`      | `3000`       | Bind port for the Next.js server.      |
+| `HOSTNAME`  | `0.0.0.0`    | Bind host. Leave alone in containers.  |
+| `NODE_ENV`  | `production` | Don't override.                        |
+
+If the API and worker get deployed in the future, the web app will gain a
+`NEXT_PUBLIC_API_BASE_URL` env var to point at them.
+
+### Why `docs/` is copied into the image
+
+The `/docs/[...slug]` route reads markdown files at request time via
+`apps/web/lib/docs.ts`. That code resolves `../../docs/` relative to the
+working directory. The Dockerfile copies `docs/` into the right path
+(`/app/docs/`) and sets `WORKDIR /app/apps/web` so the path math lines
+up. If you add new markdown under `docs/` you need to rebuild the image.
+The trade-off (vs. mounting a volume) is that deployments are atomic and
+cacheable.
+
+### Fly.io
+
+Drop this into a `fly.toml` at the repo root, then `fly launch` (first
+time) or `fly deploy` (subsequent):
 
 ```toml
 app = "asicify-web"
+primary_region = "iad"
+
 [build]
   dockerfile = "Dockerfile"
+
 [http_service]
   internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
 ```
+
+### Railway
+
+Connect the repo. Railway detects the `Dockerfile` automatically. Set
+`PORT=3000` in service variables. No other config needed.
+
+### Cloud Run
+
+```bash
+gcloud builds submit --tag gcr.io/PROJECT_ID/asicify-web
+gcloud run deploy asicify-web \
+  --image gcr.io/PROJECT_ID/asicify-web \
+  --platform managed \
+  --port 3000 \
+  --allow-unauthenticated
+```
+
+Cloud Run scales to zero when idle, which fits the workload: the
+playground is the only stateful interaction, and that state lives in the
+user's browser.
+
+### Vercel (no Docker)
+
+Vercel deploys Next.js directly without the Dockerfile. The
+`output: "standalone"` setting is harmless; Vercel uses its own runtime.
+Connect the repo and configure `apps/web` as the root directory in the
+project settings. This is the lowest-friction option for the web app
+today. Use the Dockerfile when you need to deploy alongside the API and
+worker on shared infra.
+
+### Health check
+
+The image has no dedicated `/healthz` route. Use `GET /` for liveness
+probes. A 200 response means Next is up and the markdown content is
+reachable.
+
+### Troubleshooting
+
+**`/docs/quickstart` returns 404 in the container.**
+The `docs/` directory wasn't copied into the image. Rebuild from the
+repo root, not from `apps/web/`. The build context must include `docs/`.
+
+**Build fails at `pnpm install` with a lockfile error.**
+You changed `package.json` without updating `pnpm-lock.yaml`. Run
+`pnpm install` locally first, commit the new lockfile, then rebuild.
+
+**Container starts but refuses connections.**
+Verify `PORT` and `HOSTNAME`. The default is `0.0.0.0:3000`. If your
+platform sets a different port (Cloud Run uses `8080`), pass it as an
+env var.
+
+**Image is larger than expected.**
+Check that `.dockerignore` is being respected. `apps/api`, `apps/worker`,
+and `infra/` should not be in the build context for the web image.
 
 ## FastAPI backend
 
@@ -123,8 +230,8 @@ fly scale memory 1024 -a asicify-api           # 1 GB RAM
 fly scale vm shared-cpu-2x -a asicify-api      # 2 vCPU
 ```
 
-Default in `fly.toml` is shared-cpu 1x, 512 MB. Plenty for low-traffic
-MVP. The app is async, so a single worker handles many concurrent
+Default in `fly.toml` is shared-cpu 1x, 512 MB, which covers low-traffic
+use. The app is async, so a single worker handles many concurrent
 WebSocket connections.
 
 ### Migrations
@@ -148,7 +255,7 @@ uv run alembic revision --autogenerate -m "what changed"
 
 The worker is deployed on Modal because:
 
-1. Per-call billing fits a hobby-project budget.
+1. Per-call billing fits a small-project budget.
 2. One-line GPU access (`modal.gpu.A10G()`).
 3. Scales to zero between bursts.
 
@@ -200,7 +307,7 @@ sustained, bursty load that would be slow with cold-starts.
 
 ### GPU vs CPU
 
-The default `gpu="A10G"` is overkill for the current pipeline (no
+The default `gpu="A10G"` is more than the current pipeline needs (no
 real model fine-tuning yet). For the demo + INT8 quantization +
 RTL gen, switch to:
 
@@ -226,8 +333,8 @@ When real model loading and validation come online, reinstate the GPU.
   run: uv run pytest -q
 ```
 
-Runs all 80 tests. Currently ~15 seconds end-to-end (most of which is
-the uv install).
+Runs the full pytest suite (most of the wall-clock time is the uv
+install).
 
 ### `rtl-lint-and-synth`
 
@@ -297,8 +404,8 @@ When promoting from dev to production:
       ID; before going public, add a short-lived signed token in the
       connection URL)
 - [ ] Modal secrets set (`asicify-redis`, `asicify-r2`)
-- [ ] Cost monitoring on Modal (it's per-call but easy to runaway with
-      a stuck queue_pump)
+- [ ] Cost monitoring on Modal (per-call billing, but a stuck
+      queue_pump can run away)
 - [ ] Database backups enabled on Neon
 - [ ] DNS pointed at the deployed services
 
@@ -315,20 +422,19 @@ When promoting from dev to production:
 | Modal               | $30/mo free credit | beyond that, ~$1-3/hr A10G when running |
 
 For a pre-launch tool that runs maybe 100 compile jobs a week, all of
-this is free or near-free. The first cost to materialize is Clerk if
-you cross 10K MAU.
+this is free or near-free. The first cost to materialize is Clerk past
+10K MAU.
 
-## What I haven't done
+## Remaining work
 
-- **Actually pushed to any of these services.** Everything above is the
-  recipe; running it requires the user's accounts.
-- **Wired DNS.** The web app, API, and worker need real domain names
-  (e.g. `asicify.com`, `api.asicify.com`) for production cert pinning.
-- **Set up monitoring.** Sentry SDK is referenced but not wired into
-  the API's exception handler. Adding it is a 5-line change.
-- **Production-hardened the WebSocket.** It currently trusts the
-  project ID. Before opening to the public, add signed connection
-  tokens.
+- **No service has been pushed live yet.** Everything above is the
+  recipe; running it requires hosting account credentials.
+- **DNS.** The web app, API, and worker need real domain names
+  (e.g. `asicify.com`, `api.asicify.com`) before production cert
+  pinning.
+- **Monitoring.** The Sentry SDK is referenced but not wired into the
+  API's exception handler.
+- **WebSocket hardening.** The endpoint currently trusts the project
+  ID. Before opening to the public, add signed connection tokens.
 
-These are the next deployment chores; they're not blockers on the
-dev experience.
+None of these block local development.

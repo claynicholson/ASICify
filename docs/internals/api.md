@@ -1,4 +1,4 @@
-# API Internals — `apps/api`
+# API Internals: `apps/api`
 
 FastAPI 0.115+, Pydantic v2, SQLAlchemy 2.0 async, Alembic, Redis (asyncio),
 boto3 for R2.
@@ -33,7 +33,7 @@ apps/api/
 │   └── versions/
 │       └── 20260101_*_0001_initial.py  Initial schema
 ├── pyproject.toml           Dependencies + uv config + ruff
-└── package.json             pnpm scripts (dev/lint/typecheck) — no JS deps
+└── package.json             pnpm scripts (dev/lint/typecheck), no JS deps
 ```
 
 ## Application factory
@@ -45,7 +45,7 @@ we wire Sentry or Modal warmup it goes here.
 
 Key decision: there is **no global app state** beyond what `Settings` carries.
 Database engine and Redis pool are module-level singletons in
-`app/db.py` and `app/queue.py` respectively. This keeps tests easy — a fresh
+`app/db.py` and `app/queue.py` respectively. This keeps tests easy: a fresh
 test client gets a fresh engine if you re-import.
 
 ## Auth model
@@ -53,19 +53,19 @@ test client gets a fresh engine if you re-import.
 [`app/auth.py`](../../apps/api/app/auth.py) defines a `CurrentUser`
 dataclass and a `get_current_user` dependency. Three modes:
 
-1. **Production** — `CLERK_JWT_KEY` is set. Token verified with RS256 against
+1. **Production**: `CLERK_JWT_KEY` is set. Token verified with RS256 against
    Clerk's signing key. `iss` checked against `CLERK_ISSUER`.
-2. **Dev with no Clerk** — `CLERK_JWT_KEY` empty + `X-Dev-User-Id` header
-   present. Skip verification, treat the header as the user. This is what
-   makes local development frictionless without a Clerk account.
-3. **Dev with token but no key** — signature decoded but not verified. Only
+2. **Dev with no Clerk**: `CLERK_JWT_KEY` empty + `X-Dev-User-Id` header
+   present. Skip verification, treat the header as the user. This allows
+   local development without a Clerk account.
+3. **Dev with token but no key**: signature decoded but not verified. Only
    for testing token plumbing.
 
 Mode 3 is dangerous in production; the deploy checklist must verify that
 `environment != "development"` and `CLERK_JWT_KEY` is set.
 
 User reconciliation: every authenticated route that needs a user calls
-`_ensure_user(session, current)` — see
+`_ensure_user(session, current)`; see
 [`routers/projects.py:26`](../../apps/api/app/routers/projects.py). This
 upserts the User row by `clerk_id`, so the first call after Clerk sign-up
 silently creates the row.
@@ -76,13 +76,13 @@ silently creates the row.
 
 Four tables, defined in [`app/models.py`](../../apps/api/app/models.py):
 
-- **`users`** — `clerk_id` is unique. We mirror only what we need.
-- **`projects`** — `model_source`, `compression_config`, `target_hardware`
+- **`users`**: `clerk_id` is unique. We mirror only what we need.
+- **`projects`**: `model_source`, `compression_config`, `target_hardware`
   stored as JSON. We don't normalize because (a) shapes change as we evolve
   the compiler, and (b) we never query into them.
-- **`artifacts`** — one row per generated file (RTL zip, PDF report, etc.).
+- **`artifacts`**: one row per generated file (RTL zip, PDF report, etc.).
   `r2_key` is the canonical pointer; presigned URLs are issued at read time.
-- **`jobs`** — persisted job records. The actual queue lives in Redis; this
+- **`jobs`**: persisted job records. The actual queue lives in Redis; this
   table is for status display and audit.
 
 ### Migrations
@@ -103,7 +103,7 @@ For background work that doesn't have a request, use the `session_scope`
 context manager (also in `db.py`) which commits on success and rolls back on
 exception.
 
-## Routers — the API surface
+## Routers: the API surface
 
 All five routers are mounted under `/api`. The endpoint table:
 
@@ -131,10 +131,10 @@ GET    /api/targets/{id}/cost-model        Per-target cost model parameters
 
 The hot path. Three sections:
 
-1. **`_ensure_user`** — User upsert helper.
-2. **`_load_project`** — Authorization + 404 helper. Every project route
+1. **`_ensure_user`**: User upsert helper.
+2. **`_load_project`**: Authorization + 404 helper. Every project route
    calls it; never bypass.
-3. **`_enqueue`** — Job creation pattern. Creates a `Job` row, sets project
+3. **`_enqueue`**: Job creation pattern. Creates a `Job` row, sets project
    status to `queued`, then `enqueue_job` pushes to Redis. The order matters:
    the row exists before the worker can process it, so worker progress
    updates always have a row to update.
@@ -159,7 +159,7 @@ LiveKit do it.
 ### `routers/artifacts.py`
 
 Artifact listing with presigned download URLs. R2 (and MinIO locally) issue
-URLs that expire in 1 hour by default — adjust via the `expires` argument in
+URLs that expire in 1 hour by default; adjust via the `expires` argument in
 [`app/storage.py`](../../apps/api/app/storage.py).
 
 The artifact routes do their own ownership check inline rather than reusing
@@ -172,8 +172,8 @@ auth logic, that's the cue to extract a `deps.py` module.
 These wrap the static data in `app/data/`. No database hits. The data is
 pulled from the same constants (catalog, targets) that the worker uses for
 its calculations. If you change a target's spec, you change it here and in
-`apps/worker/worker/estimator/targets.py` — see the sync rule in
-[codebase.md](../codebase.md#the-estimator-lives-in-two-places--on-purpose).
+`apps/worker/worker/estimator/targets.py`; see the sync rule in
+[codebase.md](../codebase.md#the-estimator-lives-in-two-places-on-purpose).
 
 ## Redis usage
 
@@ -191,7 +191,7 @@ Both decisions are deliberate:
   worker's only assumption is `BLPOP returns a JSON string`; switching the
   storage shape doesn't break the worker.
 - **Pub/sub for progress**: we don't need durability. If a client misses a
-  progress event because they reconnected, it's fine — the project status
+  progress event because they reconnected, it's fine; the project status
   in Postgres is the source of truth. Pub/sub gives us the lowest-latency
   delivery and trivial fan-out for shared dashboards.
 
@@ -199,14 +199,14 @@ Both decisions are deliberate:
 
 [`app/storage.py`](../../apps/api/app/storage.py) wraps `boto3.client('s3')`
 with R2 credentials. R2 is S3-compatible, and MinIO (in
-`infra/docker-compose.yml`) is also S3-compatible — same code path locally
+`infra/docker-compose.yml`) is also S3-compatible: same code path locally
 and in production.
 
 The two helpers:
 
-- `presign_upload(key, content_type, expires)` — for direct-from-browser
+- `presign_upload(key, content_type, expires)`: for direct-from-browser
   uploads. Skips the API for the actual bytes.
-- `presign_download(key, expires)` — issued in artifact list responses.
+- `presign_download(key, expires)`: issued in artifact list responses.
 
 R2 charges nothing for egress, which is why we picked it over S3.
 
@@ -234,7 +234,7 @@ acceptable:
 
 When we add Sentry, the integration goes in `app/main.py`'s lifespan and a
 `@app.exception_handler(Exception)` decorator. Don't catch and re-raise just
-to add logging — `structlog` already gets the trace.
+to add logging; `structlog` already gets the trace.
 
 ## Test plan (not yet implemented)
 

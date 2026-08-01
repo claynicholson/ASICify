@@ -1,58 +1,68 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+export function ChipMark({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect
+        x="5"
+        y="5"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      {[8.5, 12, 15.5].map((p) => (
+        <g key={p} stroke="currentColor" strokeWidth="1.3" strokeLinecap="square">
+          <line x1={p} y1="2.5" x2={p} y2="5" />
+          <line x1={p} y1="19" x2={p} y2="21.5" />
+          <line x1="2.5" y1={p} x2="5" y2={p} />
+          <line x1="19" y1={p} x2="21.5" y2={p} />
+        </g>
+      ))}
+      <rect x="9" y="9" width="6" height="6" fill="var(--color-accent)" />
+    </svg>
+  );
+}
+
+const LINKS = [
+  { href: "/playground", label: "Playground" },
+  { href: "/docs", label: "Docs" },
+  { href: "/about", label: "About" },
+];
+
 export function Nav() {
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-6">
+    <header className="sticky top-0 z-50 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/90 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 group"
+          className="flex items-center gap-2.5 text-[var(--color-text-primary)]"
           aria-label="ASICify, home"
         >
-          {/* tiny chip-mark logo */}
-          <svg
-            viewBox="0 0 24 24"
-            className="w-5 h-5"
-            aria-hidden
-          >
-            <rect
-              x="4"
-              y="4"
-              width="16"
-              height="16"
-              rx="1.5"
-              fill="var(--color-accent-muted)"
-              stroke="var(--color-accent)"
-              strokeWidth="1.6"
-            />
-            <line x1="2" y1="9" x2="4" y2="9" stroke="var(--color-text-primary)" strokeWidth="1.4" strokeLinecap="round" />
-            <line x1="2" y1="15" x2="4" y2="15" stroke="var(--color-text-primary)" strokeWidth="1.4" strokeLinecap="round" />
-            <line x1="20" y1="9" x2="22" y2="9" stroke="var(--color-text-primary)" strokeWidth="1.4" strokeLinecap="round" />
-            <line x1="20" y1="15" x2="22" y2="15" stroke="var(--color-text-primary)" strokeWidth="1.4" strokeLinecap="round" />
-            <circle cx="12" cy="12" r="2.5" fill="var(--color-accent)" />
-          </svg>
-          <span className="font-serif text-[20px] tracking-serif text-[var(--color-text-primary)] leading-none">
+          <ChipMark />
+          <span className="display-sub text-[17px] leading-none tracking-[-0.01em]">
             ASICify
           </span>
         </Link>
-        <nav className="flex items-center gap-1">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/playground">Playground</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/docs">Docs</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/about">About</Link>
-          </Button>
-          <Button asChild variant="ink" size="sm">
+        <nav className="flex items-center gap-1 sm:gap-5">
+          {LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="px-1.5 sm:px-0 text-[13px] sm:text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            >
+              {l.label}
+            </Link>
+          ))}
+          <Button asChild variant="ink" size="sm" className="ml-2">
             <a
               href="https://github.com/claynicholson/asicify"
               target="_blank"
               rel="noreferrer"
             >
-              GitHub →
+              GitHub
             </a>
           </Button>
         </nav>

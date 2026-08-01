@@ -19,7 +19,7 @@ This is the most common path. Latency budget: < 16ms (one frame).
    Code: const [config, setConfig] = useState<CompressionConfig>(…)
          React schedules a re-render.
 
-3. useMemo triggers — config changed.
+3. useMemo triggers: config changed.
    File: apps/web/app/playground/page.tsx
    Code: const estimate = useMemo(() => quickEstimate({ … }), [model, config, target])
 
@@ -31,7 +31,7 @@ This is the most common path. Latency budget: < 16ms (one frame).
    - Murphy yield + NRE amortization for cost
    No network calls. No async. Returns synchronously.
 
-5. The Pareto plot also recomputes — this useMemo iterates eight targets.
+5. The Pareto plot also recomputes: this useMemo iterates eight targets.
    File: apps/web/app/playground/page.tsx (paretoEstimates)
 
 6. Three panels re-render with the new estimate.
@@ -50,11 +50,11 @@ client-side estimator exists.
 
 Longer trace. Hits all four layers.
 
-### Phase A — Project creation
+### Phase A: Project creation
 
 ```
 1. User clicks "Save as project" in the playground.
-   File: apps/web/app/playground/page.tsx (button handler — to be wired)
+   File: apps/web/app/playground/page.tsx (button handler, to be wired)
    Future code: api.createProject({name, model_source, compression, targets}, token)
 
 2. Fetch wrapper sends the request.
@@ -79,7 +79,7 @@ Longer trace. Hits all four layers.
 6. Router handler runs.
    File: apps/api/app/routers/projects.py
    Function: create_project(body, session, current)
-   - _ensure_user(session, current) — upsert User row by clerk_id
+   - _ensure_user(session, current): upsert User row by clerk_id
    - Create Project ORM object with model_source/compression/targets as JSON
    - session.add(project), commit, refresh
    - Returns ProjectResponse (Pydantic auto-serializes)
@@ -87,7 +87,7 @@ Longer trace. Hits all four layers.
 7. Frontend receives Project, navigates to /projects/{id}.
 ```
 
-### Phase B — Job submission
+### Phase B: Job submission
 
 ```
 1. User clicks "Compile to RTL" on the project detail page.
@@ -106,7 +106,7 @@ Longer trace. Hits all four layers.
    Helper: _enqueue(session, project, job_type="compress")
    - Creates Job row with status="queued"
    - Sets project.status = "queued"
-   - Commits BEFORE enqueueing — the worker must always find the row.
+   - Commits BEFORE enqueueing; the worker must always find the row.
    - Calls enqueue_job(payload) where payload has model_source +
      compression_config + target_hardware as plain JSON.
 
@@ -118,7 +118,7 @@ Longer trace. Hits all four layers.
 6. API returns JobResponse to the frontend.
 ```
 
-### Phase C — Worker pickup
+### Phase C: Worker pickup
 
 ```
 1. Worker is blocked in BLPOP somewhere.
@@ -164,7 +164,7 @@ Longer trace. Hits all four layers.
    - {"event": "complete"}
 ```
 
-### Phase D — Progress streaming back to the user
+### Phase D: Progress streaming back to the user
 
 ```
 1. Frontend opened the WebSocket on page load.
@@ -175,7 +175,7 @@ Longer trace. Hits all four layers.
 2. API accepts the WebSocket.
    File: apps/api/app/routers/progress.py
    Handler: progress_ws(websocket, project_id)
-   Calls: subscribe_progress(project_id) — async generator
+   Calls: subscribe_progress(project_id), an async generator
 
 3. Generator subscribes to Redis pub/sub.
    File: apps/api/app/queue.py
@@ -257,14 +257,14 @@ into the codegen specifically.
       User-facing package README.
 
 5. Pack into a zip in memory.
-   Code: ZipFile(buf, "w", ZIP_DEFLATED) — one writestr per file.
+   Code: ZipFile(buf, "w", ZIP_DEFLATED); one writestr per file.
    Returns: bytes
 
 6. Upload to R2.
-   (Currently stubbed — TODO: r2_client.put_object(Bucket=…, Key=…))
+   (Currently stubbed; TODO: r2_client.put_object(Bucket=…, Key=…))
 
 7. Create Artifact row.
-   (Currently stubbed — TODO: insert via internal API call from worker.)
+   (Currently stubbed; TODO: insert via internal API call from worker.)
 
 8. Emit completion.
    emit({"event": "stage_complete", "stage": "rtl_generation", "metrics": {...}})
@@ -284,7 +284,7 @@ The output zip structure:
 │   ├── block_0.ffn.v
 │   ├── block_0.ln.v
 │   ├── block_1.attn.v
-│   ├── …
+│   └── …
 ├── tb_top.py
 ├── reference.py
 ├── Makefile
@@ -314,11 +314,11 @@ A short list of failure modes and where they surface:
 
 ## Useful debugging hooks
 
-- `redis-cli -u $REDIS_URL LRANGE asicify:jobs 0 -1` — see queued jobs
-- `redis-cli -u $REDIS_URL SUBSCRIBE 'asicify:progress:*'` — tail all progress
-- `psql $DATABASE_URL -c "select id, status, updated_at from projects order by updated_at desc limit 10"` — recent projects
-- `mc ls minio/asicify-artifacts` (with mc configured) — list R2/MinIO bucket
-- API has `/docs` — full OpenAPI explorer in dev
+- `redis-cli -u $REDIS_URL LRANGE asicify:jobs 0 -1`: see queued jobs
+- `redis-cli -u $REDIS_URL SUBSCRIBE 'asicify:progress:*'`: tail all progress
+- `psql $DATABASE_URL -c "select id, status, updated_at from projects order by updated_at desc limit 10"`: recent projects
+- `mc ls minio/asicify-artifacts` (with mc configured): list R2/MinIO bucket
+- API has `/docs`, the full OpenAPI explorer in dev
 
 When you're trying to reproduce a bug, start at the layer boundary closest
 to the symptom. UI bug → playground state. Job bug → Redis. Compute bug →

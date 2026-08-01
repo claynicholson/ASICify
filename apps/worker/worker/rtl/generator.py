@@ -28,7 +28,7 @@ from worker.kernels.layers import (
     QuantizedEmbedding,
     QuantizedLayerNorm,
 )
-from worker.kernels.pack import pack_embedding, pack_layer, pack_layernorm
+from worker.kernels.pack import _sv_rom_1d, pack_embedding, pack_layer, pack_layernorm
 from worker.pipeline.orchestrator import _cfg_from_dict
 from worker.pipeline.parse import parse_model
 from worker.types import CompressionConfig, ModelGraph
@@ -42,6 +42,8 @@ env = Environment(
     undefined=StrictUndefined,
     trim_blocks=True,
     lstrip_blocks=True,
+    # POSIX text files end in a newline; Verilator -Wall (EOFNEWLINE) agrees.
+    keep_trailing_newline=True,
 )
 
 
@@ -174,10 +176,8 @@ def render_package(graph: ModelGraph, config: CompressionConfig) -> bytes:
 
     # Softmax LUT: a single global 256-entry table used by every attention block.
     softmax_lut = build_softmax_lut()
-    softmax_cells = ", ".join(f"32'd{int(v)}" for v in softmax_lut.tolist())
-    softmax_lut_decl = (
-        f"localparam logic [31:0] SOFTMAX_LUT [0:{softmax_lut.numel() - 1}] = "
-        f"'{{ {softmax_cells} }};"
+    softmax_lut_decl = _sv_rom_1d(
+        "SOFTMAX_LUT", "[31:0]", [f"32'd{int(v)}" for v in softmax_lut.tolist()]
     )
 
     ctx: dict[str, Any] = {

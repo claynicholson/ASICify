@@ -12,7 +12,7 @@
 **The compiler for AI silicon.**
 PyTorch model in. Hardware-ready specification out.
 
-[Live playground →](http://localhost:3001/playground) · [Docs](./docs/codebase.md) · [Roadmap](./docs/roadmap.md)
+[Quickstart](./docs/quickstart.md) · [Docs](./docs/codebase.md) · [Roadmap](./docs/roadmap.md)
 
 </div>
 
@@ -36,13 +36,10 @@ those weights hardwired as ROM constants, area / throughput / cost / energy
 estimates across eleven hardware targets, an FPGA reference implementation,
 and a verified Cocotb testbench.
 
-It is the horizontal compiler underneath every AI chip company that exists
-today, and the ones that haven't started yet.
-
 ## Why
 
 Custom AI silicon costs $5–30M per tape-out and takes 6–18 months. The
-fabrication isn't the bottleneck — it's the model-to-hardware translation.
+fabrication isn't the bottleneck; the model-to-hardware translation is.
 Every chip company and edge-AI deployer currently does that translation by
 hand, with expensive specialist engineers, the same way they did it ten years
 ago.
@@ -58,7 +55,7 @@ accelerator.
 Open the playground in your browser. Drag the sparsity slider, switch between
 INT4 and ternary, swap targets between TSMC 28nm and Lattice ECP5. Watch
 silicon area, cost per chip, and throughput recompute in real time. Every
-number is from a published cost model — no fake gauges, no mock data.
+number is from a published cost model: no fake gauges, no mock data.
 
 ```
 $ pnpm --filter @asicify/web dev
@@ -110,22 +107,23 @@ artifact downloads.
 | ------------------------------------------- | ---------------------------- |
 | Live client-side estimator                  | ✓ Real math, real numbers    |
 | Markdown documentation site                 | ✓ Auto-rendered from `/docs` |
-| Landing, playground, pricing, blog, about   | ✓ Functional                 |
+| Landing, playground, blog, about            | ✓ Functional                 |
 | FastAPI backend (auth + CRUD + queue + WS)  | ✓ Endpoints wired            |
 | Postgres schema + Alembic migrations        | ✓ Initial migration shipped  |
-| Worker pipeline (parse → quantize → … → validate) | ✓ Stage orchestration  |
+| Worker pipeline (parse → quantize → … → validate) | ✓ Real kernels, end to end |
+| Model parsing (`torch.fx`-style walk)       | ✓ Linear, LayerNorm, Embedding, HF attention auto-detection |
+| Quantization                                | ✓ FP16 / INT8 / INT4 / ternary / binary, bit-exact |
+| Sparsity + decomposition                    | ✓ 2:4, 4:8, block, unstructured · SVD, Monarch, butterfly |
 | Hardware estimator (server-side)            | ✓ Cell library data for 11 targets |
 | RTL generator + 14 Jinja2 templates         | ✓ Top + linear + attention + layernorm + KV cache + testbench + synthesis scripts |
 | Multi-precision multiplier strategies       | ✓ binary / ternary / int4 CSD / int8 Booth / fp16 LUT |
-| Real `torch.fx` model parsing               | ◐ Synthesized graph stub today; real parsing is next |
-| Quantization weight-tensor work             | ◐ Config tracked; bit-packing is next |
-| WebGPU in-browser inference comparison      | ○ Roadmap                    |
-| PDF report generation                       | ○ Roadmap                    |
-| Modal deployment                            | ○ Roadmap                    |
-| Stripe billing                              | ○ Roadmap                    |
+| WebGPU in-browser inference comparison      | ✓ DistilGPT-2, WASM fallback |
+| PDF report generation                       | ✓ Via `/api/report`          |
+| Public deployment (API + worker)            | ○ Files committed, not pushed |
+| Stripe billing                              | ○ Not started                |
 
-The MVP ships a complete spine. Filling in the model-loading kernels and
-real validation does not require API or pipeline changes.
+See [docs/roadmap.md](./docs/roadmap.md) for the authoritative list of
+what's shipped, partial, and pending.
 
 ## Repository layout
 
@@ -133,7 +131,7 @@ real validation does not require API or pipeline changes.
 asicify/
 ├── apps/
 │   ├── web/             Next.js 15 frontend
-│   │                    Landing · live playground · markdown docs · blog · about · pricing
+│   │                    Landing · live playground · markdown docs · blog · about
 │   │
 │   ├── api/             FastAPI backend
 │   │                    Clerk JWT auth · project CRUD · Redis job queue · WebSocket progress
@@ -215,20 +213,17 @@ derivation.
 
 ## Compression methods
 
-Five quantization modes, four sparsity patterns, three decompositions —
+Five quantization modes, four sparsity patterns, three decompositions,
 fully composable.
 
 ```
-Quantization     FP16 ─ INT8 ─ INT4 ─ Ternary ─ Binary
-                                          1.6 bit/weight ─┐
-                                                          │ Sub-1-bit
-Sparsity         none ─ 2:4 ─ 4:8 ─ block 16×16 ─ unstructured
-                                                          │
-Decomposition    none ─ Monarch ─ Butterfly ─ Low-rank    │
-                                                          ▼
-                                                  Effective bits/weight
-                                                  drops below 1
+Quantization    FP16 · INT8 · INT4 · Ternary · Binary
+Sparsity        none · 2:4 · 4:8 · block 16×16 · unstructured
+Decomposition   none · Low-rank · Monarch · Butterfly
 ```
+
+Stacked together (ternary at 1.6 bits/weight, plus sparsity, plus
+decomposition) the effective bits per weight drop below 1.
 
 Each compression method maps to a specific multiplier strategy in the
 generated RTL:
@@ -242,38 +237,37 @@ generated RTL:
 | FP16         | Per-multiplier ROM-LUT     | small ROM                |
 
 Weights become `localparam` constants in `weights.vh`. The synthesis tool
-folds them directly into the multiplier inputs — for binary and ternary
+folds them directly into the multiplier inputs; for binary and ternary
 this collapses entirely into XOR/AND networks, with no real multipliers
 on die.
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    User (Browser)                          │
-└───────────────────────────┬────────────────────────────────┘
-                            │ HTTPS / WSS
-┌───────────────────────────▼────────────────────────────────┐
-│              Next.js Frontend (Vercel)                     │
-│  • App Router  • Server Components  • Live estimator       │
-└───────────────────────────┬────────────────────────────────┘
-                            │ REST / WebSocket
-┌───────────────────────────▼────────────────────────────────┐
-│             FastAPI Backend (Fly.io)                       │
-│  • Auth (Clerk JWT)  • Project CRUD  • Job orchestration   │
-└──────┬──────────────┬──────────────────┬───────────────────┘
-       │              │                  │
-       ▼              ▼                  ▼
-┌─────────────┐ ┌──────────────┐ ┌─────────────────────────┐
-│ PostgreSQL  │ │   Redis      │ │   Modal Labs            │
-│ (Neon)      │ │  (Upstash)   │ │  (GPU worker pool)      │
-└─────────────┘ └──────────────┘ └──────────┬──────────────┘
-                                            │
-                                            ▼
-                                  ┌─────────────────────┐
-                                  │   Cloudflare R2     │
-                                  │   Artifacts         │
-                                  └─────────────────────┘
+┌────────────────────────────────────────────────┐
+│                 User (browser)                 │
+└───────────────────────┬────────────────────────┘
+                        │ HTTPS / WSS
+┌───────────────────────▼────────────────────────┐
+│           Next.js frontend (Vercel)            │
+│   App Router · server components · estimator   │
+└───────────────────────┬────────────────────────┘
+                        │ REST / WebSocket
+┌───────────────────────▼────────────────────────┐
+│       FastAPI backend (Fly.io / Railway)       │
+│       Clerk JWT auth · job orchestration       │
+└───────┬────────────────┬────────────────┬──────┘
+        │                │                │
+        ▼                ▼                ▼
+ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+ │ PostgreSQL  │  │    Redis    │  │ Modal Labs  │
+ │   (Neon)    │  │  (Upstash)  │  │ GPU workers │
+ └─────────────┘  └─────────────┘  └──────┬──────┘
+                                          │
+                                          ▼
+                                   ┌─────────────┐
+                                   │Cloudflare R2│
+                                   └─────────────┘
 ```
 
 The compiler core (`apps/worker/worker/{pipeline,rtl,estimator}/`) runs
@@ -326,22 +320,22 @@ chip change. Cached estimates update in under a millisecond.
 
 **For users:**
 
-- [docs/quickstart.md](./docs/quickstart.md) — Compile your first model
-- [docs/architecture.md](./docs/architecture.md) — System overview
-- [docs/methodology.md](./docs/methodology.md) — Cost model derivation
-- [docs/rtl-generation.md](./docs/rtl-generation.md) — Verilog templates and multiplier strategies
-- [docs/roadmap.md](./docs/roadmap.md) — Phase plan
+- [docs/quickstart.md](./docs/quickstart.md): compile your first model
+- [docs/architecture.md](./docs/architecture.md): system overview
+- [docs/methodology.md](./docs/methodology.md): cost model derivation
+- [docs/rtl-generation.md](./docs/rtl-generation.md): Verilog templates and multiplier strategies
+- [docs/roadmap.md](./docs/roadmap.md): phase plan
 
 **For contributors:**
 
-- [docs/codebase.md](./docs/codebase.md) — Codebase tour. Start here.
-- [docs/internals/web.md](./docs/internals/web.md) — Frontend
-- [docs/internals/api.md](./docs/internals/api.md) — Backend
-- [docs/internals/worker.md](./docs/internals/worker.md) — Pipeline + RTL gen + estimator
-- [docs/internals/data-flow.md](./docs/internals/data-flow.md) — End-to-end traces
-- [docs/internals/extending.md](./docs/internals/extending.md) — Recipes: add a target, a precision, a primitive
-- [docs/internals/conventions.md](./docs/internals/conventions.md) — Code style
-- [docs/internals/glossary.md](./docs/internals/glossary.md) — ML, silicon, EDA terminology
+- [docs/codebase.md](./docs/codebase.md): codebase tour. Start here.
+- [docs/internals/web.md](./docs/internals/web.md): frontend
+- [docs/internals/api.md](./docs/internals/api.md): backend
+- [docs/internals/worker.md](./docs/internals/worker.md): pipeline + RTL gen + estimator
+- [docs/internals/data-flow.md](./docs/internals/data-flow.md): end-to-end traces
+- [docs/internals/extending.md](./docs/internals/extending.md): recipes to add a target, a precision, a primitive
+- [docs/internals/conventions.md](./docs/internals/conventions.md): code style
+- [docs/internals/glossary.md](./docs/internals/glossary.md): ML, silicon, EDA terminology
 
 ## Status
 

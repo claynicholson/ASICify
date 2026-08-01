@@ -92,9 +92,7 @@ export default function PlaygroundPage() {
       <main className="mx-auto max-w-[1440px] px-6 py-8">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight-display">
-              Playground
-            </h1>
+            <h1 className="display-sub text-3xl">Playground</h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
               Live estimates as you tune compression. All math runs in your
               browser. No signup, no backend.

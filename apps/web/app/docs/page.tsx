@@ -22,9 +22,7 @@ export default async function DocsIndexPage() {
 
   return (
     <div>
-      <h1 className="text-[2.5rem] font-bold tracking-tight-display leading-[1.1]">
-        Documentation
-      </h1>
+      <h1 className="display text-[2.5rem]">Documentation</h1>
       <p className="mt-3 text-[var(--color-text-secondary)] max-w-2xl">
         Everything you need to compile a model into hardware-ready Verilog,
         interpret the cost estimates, and ship the result to your fab.

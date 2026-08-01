@@ -3,30 +3,30 @@
 ## High-level system
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    User (Browser)                          │
-└───────────────────────────┬────────────────────────────────┘
-                            │ HTTPS / WSS
-┌───────────────────────────▼────────────────────────────────┐
-│              Next.js Frontend (Vercel)                     │
-│  • App Router  • Server Components  • WebGPU inference     │
-└───────────────────────────┬────────────────────────────────┘
-                            │ REST / WebSocket
-┌───────────────────────────▼────────────────────────────────┐
-│             FastAPI Backend (Fly.io / Railway)             │
-│  • Auth (Clerk JWT)  • Job orchestration                   │
-└──────┬──────────────┬──────────────────┬───────────────────┘
-       │              │                  │
-       ▼              ▼                  ▼
-┌─────────────┐ ┌──────────────┐ ┌─────────────────────────┐
-│ PostgreSQL  │ │   Redis      │ │   Modal Labs            │
-│ (Neon)      │ │  (Upstash)   │ │  (GPU Worker Pool)      │
-└─────────────┘ └──────────────┘ └──────────────────────────┘
-                                              │
-                                              ▼
-                                  ┌─────────────────────────┐
-                                  │   Cloudflare R2         │
-                                  └─────────────────────────┘
+┌────────────────────────────────────────────────┐
+│                 User (browser)                 │
+└───────────────────────┬────────────────────────┘
+                        │ HTTPS / WSS
+┌───────────────────────▼────────────────────────┐
+│           Next.js frontend (Vercel)            │
+│    App Router · server components · WebGPU     │
+└───────────────────────┬────────────────────────┘
+                        │ REST / WebSocket
+┌───────────────────────▼────────────────────────┐
+│       FastAPI backend (Fly.io / Railway)       │
+│       Clerk JWT auth · job orchestration       │
+└───────┬────────────────┬────────────────┬──────┘
+        │                │                │
+        ▼                ▼                ▼
+ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+ │ PostgreSQL  │  │    Redis    │  │ Modal Labs  │
+ │   (Neon)    │  │  (Upstash)  │  │ GPU workers │
+ └─────────────┘  └─────────────┘  └──────┬──────┘
+                                          │
+                                          ▼
+                                   ┌─────────────┐
+                                   │Cloudflare R2│
+                                   └─────────────┘
 ```
 
 ## Component responsibilities
@@ -64,8 +64,8 @@ Tables: `users`, `projects`, `artifacts`, `jobs`. Schema lives in
 
 ### Redis (Upstash)
 
-- `asicify:jobs` — list, BLPOP'd by workers
-- `asicify:progress:<project_id>` — pub/sub channel per project
+- `asicify:jobs`: list, BLPOP'd by workers
+- `asicify:progress:<project_id>`: pub/sub channel per project
 - Rate-limit counters
 - Session cache
 

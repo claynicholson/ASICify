@@ -6,9 +6,9 @@
 
 We measure quality on a held-out benchmark suite per task type:
 
-- **Language modeling** — WikiText perplexity (default), HellaSwag, ARC-Easy
-- **Classification** — ImageNet top-1, or task-specific dataset
-- **Speech** — LibriSpeech WER (Whisper family)
+- **Language modeling**: WikiText perplexity (default), HellaSwag, ARC-Easy
+- **Classification**: ImageNet top-1, or task-specific dataset
+- **Speech**: LibriSpeech WER (Whisper family)
 
 Quality numbers are reported as deltas from the user's baseline checkpoint, not
 from absolute leaderboards. This matters because users care whether their
@@ -91,4 +91,4 @@ methodology sections.
 - Mixed-signal blocks (only digital paths)
 
 These are roadmap items. For tape-out-grade signoff, use commercial EDA
-tools — ASICify is for feasibility analysis and design space exploration.
+tools; ASICify is for feasibility analysis and design space exploration.

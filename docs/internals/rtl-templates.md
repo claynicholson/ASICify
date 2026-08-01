@@ -54,7 +54,7 @@ Each `*_view` dict has at minimum `name`, `symbol`, `module_name`,
 `out_features`, `has_bias`. LayerNorm views have `dim`. Embedding views
 have `vocab_size`, `embedding_dim`.
 
-### `_safe_symbol(name)` — Verilog identifier hygiene
+### `_safe_symbol(name)`: Verilog identifier hygiene
 
 Module paths from PyTorch can have dots (`block.0.fc1`). Verilog needs
 identifiers without dots. The helper replaces every non-alphanumeric
@@ -65,7 +65,7 @@ everywhere.
 
 ## Template-by-template reference
 
-### `linear_layer.v.j2` — the heart of the compiler
+### `linear_layer.v.j2`: the heart of the compiler
 
 **Generates**: `modules/layer_<symbol>.v`. One per linear layer.
 
@@ -109,7 +109,7 @@ while streaming.
 `unpack_w` plus a new pack format and a new `_multiplier_strategy`
 mapping.
 
-### `weights.vh.j2` — the constant database
+### `weights.vh.j2`: the constant database
 
 **Generates**: `weights.vh` (top-level, not under `modules/`).
 
@@ -130,7 +130,7 @@ module file simple (`\`include "weights.vh"`).
 **Why at top level (not `weights/weights.vh`)**: simulators look in the
 include search path; the simplest path is a sibling to `top.v`.
 
-### `top.v.j2` — pipeline wrapper
+### `top.v.j2`: pipeline wrapper
 
 **Generates**: `top.v`.
 
@@ -155,7 +155,7 @@ the top-level pipeline. The user wires them by hand for now (or
 modifies this template). Adding auto-wiring needs a clearer
 `graph.layers` ordering with non-linear stages tagged.
 
-### `layernorm.v.j2` — LayerNorm with int sqrt
+### `layernorm.v.j2`: LayerNorm with int sqrt
 
 **Generates**: `modules/layer_<symbol>.v` for each LayerNorm.
 
@@ -170,7 +170,7 @@ simulation. Verilator supports these. For real synthesis, replace with
 a small Newton-Raphson LUT (a 256-entry sqrt table is sufficient at
 int8 input scale). This is a tracked future item.
 
-### `embedding.v.j2` — token lookup
+### `embedding.v.j2`: token lookup
 
 **Generates**: `modules/layer_<symbol>.v` for each Embedding.
 
@@ -179,10 +179,10 @@ streams out the `DIM` int8 components of that row over `DIM` cycles.
 
 **Hardware mapping**: synthesis tools turn the 2D constant array into
 a real ROM. On FPGA this becomes BRAM. On ASIC it becomes mask ROM.
-This is the single largest area consumer for token-input models — the
+This is the single largest area consumer for token-input models: the
 storage scales as `vocab × dim × 8 bits`.
 
-### `softmax.v.j2` — LUT-based softmax
+### `softmax.v.j2`: LUT-based softmax
 
 **Generates**: `softmax.v` (always emitted, used by attention).
 
@@ -202,7 +202,7 @@ handling. Yosys synthesizes it as a generic divider, which is large.
 The conventional alternative: replace with `1 / sum * exp_q15` using
 a reciprocal LUT plus one multiply. Tracked future item.
 
-### `kv_cache.v.j2` — addressable BRAM
+### `kv_cache.v.j2`: addressable BRAM
 
 **Generates**: `kv_cache.v` (always emitted).
 
@@ -214,7 +214,7 @@ attention heads.
 Synthesis tools recognize this pattern and infer real BRAM blocks
 (both Yosys/nextpnr for ECP5 and Vivado for Xilinx).
 
-### `reference.py.j2` — bit-exact NumPy reference
+### `reference.py.j2`: bit-exact NumPy reference
 
 **Generates**: `reference.py` (top-level).
 
@@ -237,7 +237,7 @@ return y_int32
 bit-exactness test in `tests/test_end_to_end.py` runs 32 random
 inputs through this and the in-process kernel and asserts equality.
 
-### `tb_top.py.j2` — cocotb testbench
+### `tb_top.py.j2`: cocotb testbench
 
 **Generates**: `tb_top.py` (top-level, picked up by `make sim`).
 
@@ -246,13 +246,13 @@ cocotb's clock + valid/ready handshake, collects the int32 outputs,
 asserts they equal `reference.reference_forward(inputs)`.
 
 **Requires** verilator + cocotb on the host. The Makefile checks for
-both and prints a helpful install hint if missing.
+both and prints an install hint if missing.
 
 **Twos-complement helper**: cocotb returns 32-bit signal values as
 unsigned ints. The `_twos_complement(v, 32)` helper converts back to
 signed int32 for the comparison.
 
-### `Makefile.j2` — build targets
+### `Makefile.j2`: build targets
 
 **Generates**: `Makefile` (top-level).
 
@@ -264,10 +264,10 @@ Targets:
 | `lint` | Verilator lint-only (fast CI) | verilator |
 | `synth-yosys` | ECP5 synthesis + place-and-route | yosys, nextpnr-ecp5 |
 | `synth-vivado` | Xilinx synthesis | vivado |
-| `clean` | Remove build artifacts | — |
+| `clean` | Remove build artifacts | none |
 
 Each tool-requiring target checks for the binary first and exits with
-a friendly install hint if missing.
+an install hint if missing.
 
 ### `synthesis/yosys.tcl.j2`, `nextpnr.sh.j2`, `vivado.tcl.j2`
 
@@ -276,7 +276,7 @@ The Yosys script reads all Verilog sources, hierarchies on `top`, then
 calls `synth_ecp5 -json`. nextpnr places and routes. Vivado does the
 equivalent for Xilinx parts.
 
-### `README.md.j2` — user-facing package README
+### `README.md.j2`: user-facing package README
 
 **Generates**: `README.md` in the package root. Documents the package
 contents, the numerical conventions, and the build commands.

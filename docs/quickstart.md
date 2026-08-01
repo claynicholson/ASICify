@@ -50,11 +50,9 @@ make sim          # cocotb + Verilator simulation
 make synth-yosys  # ECP5 synthesis (requires yosys + nextpnr)
 ```
 
-> **Note**: the worker pipeline currently uses a synthesized model graph
-> rather than real `torch.fx` parsing, and quantization tracks the config
-> without yet packing weight tensors. The shape of the output is final;
-> the kernel work to fill in the bytes is the next phase. See the
-> [roadmap](/docs/roadmap) for what's wired versus stubbed.
+> **Note**: the compiler core (parsing, quantization, sparsity,
+> decomposition, RTL generation, validation) is implemented end-to-end.
+> See the [roadmap](/docs/roadmap) for what's shipped versus pending.
 
 ## REST API (not yet deployed)
 

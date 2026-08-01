@@ -18,6 +18,12 @@ multiplier strategy in the Verilog template expects:
 
 All scales remain Q0.31 unsigned 32-bit. All biases remain pre-rescale int32.
 The only thing that changes per precision is how the weights are stored.
+
+Tables are emitted as `reg` arrays initialized in an `initial` block rather
+than unpacked-array localparams: Yosys's Verilog frontend has never parsed
+`localparam ... [0:N] = '{...}` (which silently broke the synth-check and
+the ECP5 flow), while reg-plus-initial ROMs are the idiom every tool
+supports and synthesis folds them into constants just the same.
 """
 
 from __future__ import annotations
@@ -25,6 +31,36 @@ from __future__ import annotations
 import torch
 
 from worker.kernels.quantize import QuantizedLinear
+
+_CELLS_PER_LINE = 8
+
+
+def _sv_rom_1d(name: str, elem_type: str, cells: list[str]) -> str:
+    """`reg <type> name [0:N-1];` + initial-block assignments, 8 per line."""
+    decl = f"reg {elem_type} {name} [0:{len(cells) - 1}];"
+    lines: list[str] = []
+    for start in range(0, len(cells), _CELLS_PER_LINE):
+        chunk = " ".join(
+            f"{name}[{start + k}] = {v};"
+            for k, v in enumerate(cells[start : start + _CELLS_PER_LINE])
+        )
+        lines.append(f"        {chunk}")
+    return decl + "\ninitial begin\n" + "\n".join(lines) + "\nend"
+
+
+def _sv_rom_2d(name: str, elem_type: str, rows: list[list[str]]) -> str:
+    """2-D variant; each source row starts on a fresh line."""
+    n_rows, n_cols = len(rows), len(rows[0])
+    decl = f"reg {elem_type} {name} [0:{n_rows - 1}][0:{n_cols - 1}];"
+    lines: list[str] = []
+    for r, row in enumerate(rows):
+        for start in range(0, n_cols, _CELLS_PER_LINE):
+            chunk = " ".join(
+                f"{name}[{r}][{start + k}] = {v};"
+                for k, v in enumerate(row[start : start + _CELLS_PER_LINE])
+            )
+            lines.append(f"        {chunk}")
+    return decl + "\ninitial begin\n" + "\n".join(lines) + "\nend"
 
 # ---------------------------------------------------------------------------
 # Scale + bias tables (precision-independent)
@@ -40,8 +76,8 @@ def scale_q31_array_to_sv(name: str, scale: torch.Tensor) -> str:
         .clamp(0, (1 << 31) - 1)
         .to(torch.int64)
     )
-    cells = ", ".join(f"32'd{int(v)}" for v in q31.tolist())
-    return f"localparam logic [31:0] {name} [0:{q31.numel() - 1}] = '{{ {cells} }};"
+    cells = [f"32'd{int(v)}" for v in q31.tolist()]
+    return _sv_rom_1d(name, "[31:0]", cells)
 
 
 # Backwards-compatible alias used by older call sites and tests.
@@ -60,14 +96,11 @@ def bias_q_array_to_sv(name: str, bias: torch.Tensor | None, scale: torch.Tensor
         .clamp(-(2**31), 2**31 - 1)
         .to(torch.int64)
     )
-    cells = ", ".join(
+    cells = [
         f"32'sd{int(v)}" if int(v) >= 0 else f"-32'sd{-int(v)}"
         for v in bias_int.tolist()
-    )
-    return (
-        f"localparam logic signed [31:0] {name} [0:{bias_int.numel() - 1}] = "
-        f"'{{ {cells} }};"
-    )
+    ]
+    return _sv_rom_1d(name, "signed [31:0]", cells)
 
 
 # ---------------------------------------------------------------------------
@@ -82,16 +115,11 @@ def int8_array_to_sv(name: str, tensor: torch.Tensor) -> str:
             f"int8_array_to_sv expects 2D int8; got "
             f"shape={tuple(tensor.shape)} dtype={tensor.dtype}"
         )
-    out_f, in_f = tensor.shape
-    rows: list[str] = []
-    for row in tensor.tolist():
-        cells = ", ".join(f"8'sd{v}" if v >= 0 else f"-8'sd{-v}" for v in row)
-        rows.append(f"        '{{ {cells} }}")
-    body = ",\n".join(rows)
-    return (
-        f"localparam logic signed [7:0] {name} [0:{out_f - 1}][0:{in_f - 1}] = "
-        f"'{{\n{body}\n    }};"
-    )
+    rows = [
+        [f"8'sd{v}" if v >= 0 else f"-8'sd{-v}" for v in row]
+        for row in tensor.tolist()
+    ]
+    return _sv_rom_2d(name, "signed [7:0]", rows)
 
 
 def int4_array_to_sv(name: str, tensor: torch.Tensor) -> str:
@@ -104,7 +132,7 @@ def int4_array_to_sv(name: str, tensor: torch.Tensor) -> str:
         raise ValueError("int4_array_to_sv expects 2D int8 tensor in [-7, 7]")
     out_f, in_f = tensor.shape
     bytes_per_row = (in_f + 1) // 2
-    rows: list[str] = []
+    rows: list[list[str]] = []
     for row in tensor.tolist():
         bytes_out: list[str] = []
         for j in range(bytes_per_row):
@@ -112,12 +140,8 @@ def int4_array_to_sv(name: str, tensor: torch.Tensor) -> str:
             hi = row[2 * j + 1] if 2 * j + 1 < in_f else 0
             byte = ((lo & 0xF) | ((hi & 0xF) << 4)) & 0xFF
             bytes_out.append(f"8'h{byte:02x}")
-        rows.append(f"        '{{ {', '.join(bytes_out)} }}")
-    body = ",\n".join(rows)
-    return (
-        f"localparam logic [7:0] {name} [0:{out_f - 1}][0:{bytes_per_row - 1}] = "
-        f"'{{\n{body}\n    }};"
-    )
+        rows.append(bytes_out)
+    return _sv_rom_2d(name, "[7:0]", rows)
 
 
 def ternary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
@@ -130,7 +154,7 @@ def ternary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
         raise ValueError("ternary_array_to_sv expects 2D int8 tensor in {-1, 0, 1}")
     out_f, in_f = tensor.shape
     bytes_per_row = (in_f + 3) // 4
-    rows: list[str] = []
+    rows: list[list[str]] = []
     for row in tensor.tolist():
         bytes_out: list[str] = []
         for j in range(bytes_per_row):
@@ -141,12 +165,8 @@ def ternary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
                 code = 0 if v == 0 else (1 if v > 0 else 3)
                 byte |= (code & 0x3) << (2 * k)
             bytes_out.append(f"8'h{byte:02x}")
-        rows.append(f"        '{{ {', '.join(bytes_out)} }}")
-    body = ",\n".join(rows)
-    return (
-        f"localparam logic [7:0] {name} [0:{out_f - 1}][0:{bytes_per_row - 1}] = "
-        f"'{{\n{body}\n    }};"
-    )
+        rows.append(bytes_out)
+    return _sv_rom_2d(name, "[7:0]", rows)
 
 
 def fp16_array_to_sv(name: str, tensor: torch.Tensor) -> str:
@@ -162,18 +182,13 @@ def fp16_array_to_sv(name: str, tensor: torch.Tensor) -> str:
             f"fp16_array_to_sv expects 2D float16; got "
             f"shape={tuple(tensor.shape)} dtype={tensor.dtype}"
         )
-    out_f, in_f = tensor.shape
-    rows: list[str] = []
-    for row in tensor.view(torch.int16).tolist():
+    rows = [
         # int16 view of fp16 bits; convert negative two's-complement back to
         # the unsigned 16-bit hex pattern Verilog expects.
-        cells = ", ".join(f"16'h{(v & 0xFFFF):04x}" for v in row)
-        rows.append(f"        '{{ {cells} }}")
-    body = ",\n".join(rows)
-    return (
-        f"localparam logic [15:0] {name} [0:{out_f - 1}][0:{in_f - 1}] = "
-        f"'{{\n{body}\n    }};"
-    )
+        [f"16'h{(v & 0xFFFF):04x}" for v in row]
+        for row in tensor.view(torch.int16).tolist()
+    ]
+    return _sv_rom_2d(name, "[15:0]", rows)
 
 
 def binary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
@@ -182,7 +197,7 @@ def binary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
         raise ValueError("binary_array_to_sv expects 2D int8 tensor in {-1, +1}")
     out_f, in_f = tensor.shape
     bytes_per_row = (in_f + 7) // 8
-    rows: list[str] = []
+    rows: list[list[str]] = []
     for row in tensor.tolist():
         bytes_out: list[str] = []
         for j in range(bytes_per_row):
@@ -193,12 +208,8 @@ def binary_array_to_sv(name: str, tensor: torch.Tensor) -> str:
                 bit = 1 if v > 0 else 0
                 byte |= (bit & 1) << k
             bytes_out.append(f"8'h{byte:02x}")
-        rows.append(f"        '{{ {', '.join(bytes_out)} }}")
-    body = ",\n".join(rows)
-    return (
-        f"localparam logic [7:0] {name} [0:{out_f - 1}][0:{bytes_per_row - 1}] = "
-        f"'{{\n{body}\n    }};"
-    )
+        rows.append(bytes_out)
+    return _sv_rom_2d(name, "[7:0]", rows)
 
 
 # ---------------------------------------------------------------------------
@@ -211,10 +222,10 @@ def pack_layernorm(symbol: str, qln) -> str:
     n = qln.dim
 
     def _int32_array(name: str, t: torch.Tensor) -> str:
-        cells = ", ".join(
+        cells = [
             f"32'sd{int(v)}" if int(v) >= 0 else f"-32'sd{-int(v)}" for v in t.tolist()
-        )
-        return f"localparam logic signed [31:0] {name} [0:{n - 1}] = '{{ {cells} }};"
+        ]
+        return _sv_rom_1d(name, "signed [31:0]", cells)
 
     return "\n".join(
         [
@@ -231,16 +242,14 @@ def pack_embedding(symbol: str, qe) -> str:
     if qe.table_int8.dim() != 2 or qe.table_int8.dtype != torch.int8:
         raise ValueError("embedding table must be 2D int8")
     vocab, dim = qe.table_int8.shape
-    rows: list[str] = []
-    for row in qe.table_int8.tolist():
-        cells = ", ".join(f"8'sd{v}" if v >= 0 else f"-8'sd{-v}" for v in row)
-        rows.append(f"        '{{ {cells} }}")
-    body = ",\n".join(rows)
+    rows = [
+        [f"8'sd{v}" if v >= 0 else f"-8'sd{-v}" for v in row]
+        for row in qe.table_int8.tolist()
+    ]
     return "\n".join(
         [
             f"// {symbol}: Embedding vocab={vocab} dim={dim}",
-            f"localparam logic signed [7:0] EMBED_{symbol} [0:{vocab - 1}][0:{dim - 1}] = "
-            f"'{{\n{body}\n    }};",
+            _sv_rom_2d(f"EMBED_{symbol}", "signed [7:0]", rows),
         ]
     )
 

@@ -19,7 +19,8 @@ def test_int8_array_to_sv_round_trip():
     """The emitted Verilog literal contains every int value from the source tensor."""
     t = torch.tensor([[1, -127, 0], [127, -1, 42]], dtype=torch.int8)
     sv = int8_array_to_sv("W_test", t)
-    assert "localparam logic signed [7:0] W_test [0:1][0:2]" in sv
+    assert "reg signed [7:0] W_test [0:1][0:2];" in sv
+    assert "initial begin" in sv
     # Values present and signed correctly.
     for v in [1, 127, 42]:
         assert f"8'sd{v}" in sv

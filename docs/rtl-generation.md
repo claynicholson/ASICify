@@ -12,7 +12,7 @@ package.
 
 This trades silicon area for latency and throughput predictability. For models
 that fit comfortably on one die (<1B params at INT4), this is the right
-default. For larger models we need tile-based reuse — see roadmap.
+default. Larger models need tile-based reuse; see the roadmap.
 
 ## Templates
 
@@ -21,7 +21,7 @@ One Jinja2 template per primitive, in
 
 | Template            | Generates                              |
 | ------------------- | -------------------------------------- |
-| `top.v.j2`          | Top wrapper — wires layers in pipeline |
+| `top.v.j2`          | Top wrapper; wires layers in pipeline  |
 | `linear_layer.v.j2` | Fixed-coefficient matrix-vector MAC    |
 | `attention.v.j2`    | Q/K/V proj + scaled dot-product + softmax + O proj |
 | `layernorm.v.j2`    | Mean/variance + normalize+scale+shift  |
@@ -46,9 +46,9 @@ One Jinja2 template per primitive, in
 | FP16      | LUT-based            | small per-multiply ROM                     |
 
 The `weights.vh` file declares each weight as a `localparam`, and the
-synthesis tool folds the constants into the multiplier inputs — that's how we
-get the area numbers down. For binary and ternary, this turns into a network
-of XOR/AND gates with no actual multipliers.
+synthesis tool folds the constants into the multiplier inputs, which is how
+the area numbers come down. For binary and ternary, this turns into a
+network of XOR/AND gates with no actual multipliers.
 
 ## Verification
 

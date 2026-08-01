@@ -46,7 +46,6 @@ export const DOC_SECTIONS: DocSection[] = [
     title: "Getting started",
     items: [
       { slug: "quickstart", label: "Quickstart", description: "Compile your first model in 5 minutes." },
-      { slug: "deployment", label: "Deployment", description: "Build and run the Docker image." },
     ],
   },
   {
@@ -68,7 +67,7 @@ export const DOC_SECTIONS: DocSection[] = [
       { slug: "internals/worker", label: "Worker overview", description: "High-level worker tour." },
       { slug: "internals/kernels", label: "Kernels deep dive", description: "Quantize, pack, sparsity, layers, attention. Bit-exactness contract." },
       { slug: "internals/rtl-templates", label: "RTL templates", description: "Every Verilog template, what it generates, how to extend." },
-      { slug: "internals/testing", label: "Testing", description: "62 tests, what each one proves, how to add new ones." },
+      { slug: "internals/testing", label: "Testing", description: "What each test suite proves, and how to add new tests." },
       { slug: "internals/data-flow", label: "Data flow", description: "End-to-end traces." },
       { slug: "internals/extending", label: "Extending", description: "Recipes for adding precisions, layers, targets, stages." },
       { slug: "internals/deployment", label: "Deployment runbook", description: "Web, API, worker, CI. Per-service playbook." },

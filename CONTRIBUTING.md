@@ -6,15 +6,15 @@ folks.
 
 ## Where to start
 
-- **Issues labeled `good first issue`** — usually new template additions, a new
+- **Issues labeled `good first issue`**: usually new template additions, a new
   hardware target's cell library data, or a bug in the cost model.
-- **New hardware target** — add a cell library to
+- **New hardware target**: add a cell library to
   `apps/worker/worker/estimator/targets.py` and a `TargetSpec` to
   `apps/api/app/data/targets.py` plus the matching entry in
   `packages/shared/src/targets.ts`.
-- **New compression method** — implement a new pipeline stage in
+- **New compression method**: implement a new pipeline stage in
   `apps/worker/worker/pipeline/` and wire it into the orchestrator.
-- **New RTL primitive** — add a `*.v.j2` template in
+- **New RTL primitive**: add a `*.v.j2` template in
   `apps/worker/worker/rtl/templates/` and reference it from `generator.py`.
 
 ## Development setup

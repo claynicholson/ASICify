@@ -18,7 +18,7 @@ file paths, the sequence of edits, the test that proves it works.
 
 Worked example: FP4 with shared exponent.
 
-### 1. Quantization kernel — `apps/worker/worker/kernels/quantize.py`
+### 1. Quantization kernel: `apps/worker/worker/kernels/quantize.py`
 
 ```python
 def quantize_linear_fp4(weight, bias=None):
@@ -55,7 +55,7 @@ def quantize_linear(weight, bias, quantization):
     ...
 ```
 
-### 2. Pack — `apps/worker/worker/kernels/pack.py`
+### 2. Pack: `apps/worker/worker/kernels/pack.py`
 
 ```python
 def fp4_array_to_sv(name, tensor):
@@ -70,7 +70,7 @@ elif q.quantization == "fp4":
     weights_sv = fp4_array_to_sv(f"W_{symbol}", q.weight_int8)
 ```
 
-### 3. Multiplier strategy — `apps/worker/worker/rtl/generator.py`
+### 3. Multiplier strategy: `apps/worker/worker/rtl/generator.py`
 
 ```python
 def _multiplier_strategy(quantization):
@@ -80,7 +80,7 @@ def _multiplier_strategy(quantization):
     }[quantization]
 ```
 
-### 4. Verilog template — `apps/worker/worker/rtl/templates/linear_layer.v.j2`
+### 4. Verilog template: `apps/worker/worker/rtl/templates/linear_layer.v.j2`
 
 Add an `unpack_w` arm:
 
@@ -103,7 +103,7 @@ canonical signed form (the stored int8 *is* the dequantized value
 times some scale; the linear math is the same). The pack/unpack is
 the only thing that changes per precision.
 
-### 5. Test — `apps/worker/tests/test_quantize_multi.py`
+### 5. Test: `apps/worker/tests/test_quantize_multi.py`
 
 Add `"fp4"` to the parametrize lists:
 
@@ -112,10 +112,10 @@ Add `"fp4"` to the parametrize lists:
 def test_reference_matches_kernel_for_each_precision(...)
 ```
 
-Run `python -m uv run pytest tests/test_quantize_multi.py -v` and you'll
-see the new precision pass alongside the others.
+Run `python -m uv run pytest tests/test_quantize_multi.py -v`; the new
+precision should pass alongside the others.
 
-### 6. UI — `apps/web/components/playground/config-panel.tsx`
+### 6. UI: `apps/web/components/playground/config-panel.tsx`
 
 Add `{ value: "fp4", label: "FP4", bits: "4 bit (E2M1)" }` to
 `QUANT_OPTIONS`.
@@ -135,7 +135,7 @@ And the matching server-side estimator at
 
 Worked example: 1:2 (half-density structured).
 
-### 1. Kernel — `apps/worker/worker/kernels/sparsity.py`
+### 1. Kernel: `apps/worker/worker/kernels/sparsity.py`
 
 ```python
 def apply_1_to_2(weight):
@@ -161,17 +161,17 @@ def apply_sparsity(weight, sparsity_type, ratio):
         return apply_1_to_2(weight)
 ```
 
-### 3. Type — `packages/shared/src/types.ts`
+### 3. Type: `packages/shared/src/types.ts`
 
 Add `"structured_1_2"` to the `SparsityType` union (mirror in the API
 schema and worker dataclass).
 
-### 4. UI — `apps/web/components/playground/config-panel.tsx`
+### 4. UI: `apps/web/components/playground/config-panel.tsx`
 
 Add `{ value: "structured_1_2", label: "1:2 structured" }` to
 `SPARSITY_OPTIONS`.
 
-### 5. Test — `apps/worker/tests/test_sparsity.py`
+### 5. Test: `apps/worker/tests/test_sparsity.py`
 
 Mirror the existing 2:4 tests for the new pattern.
 
@@ -179,12 +179,12 @@ Mirror the existing 2:4 tests for the new pattern.
 
 Worked example: TSMC 5nm.
 
-### 1. TypeScript types — `packages/shared/src/types.ts`
+### 1. TypeScript types: `packages/shared/src/types.ts`
 
 Add `"tsmc5"` to `TargetId`. Add a `TargetSpec` to
 `packages/shared/src/targets.ts:TARGETS`.
 
-### 2. Client estimator — `apps/web/lib/estimator.ts`
+### 2. Client estimator: `apps/web/lib/estimator.ts`
 
 Add a row to `NODE_PARAMS`:
 
@@ -202,17 +202,17 @@ tsmc5: {
 },
 ```
 
-### 3. Server estimator — `apps/worker/worker/estimator/targets.py`
+### 3. Server estimator: `apps/worker/worker/estimator/targets.py`
 
 Add a `NodeParams(...)` row to `ASIC_NODES` with the *same numbers*. The
 two estimators must stay in sync; refining one without the other gives
 a misleading playground.
 
-### 4. API target catalog — `apps/api/app/data/targets.py`
+### 4. API target catalog: `apps/api/app/data/targets.py`
 
 Add a `TargetSpec(...)` entry to the `TARGETS` list.
 
-### 5. Pydantic schema — `apps/api/app/schemas.py`
+### 5. Pydantic schema: `apps/api/app/schemas.py`
 
 Extend the `TargetId` `Literal` union.
 
@@ -231,7 +231,7 @@ python -m uv run asicify estimate --target tsmc5
 
 Worked example: `nn.Conv2d`.
 
-### 1. Parser — `apps/worker/worker/pipeline/parse.py`
+### 1. Parser: `apps/worker/worker/pipeline/parse.py`
 
 Add to `_classify_module`:
 
@@ -253,7 +253,7 @@ if isinstance(module, nn.Conv2d):
     return "conv2d", info
 ```
 
-### 2. Quantizer — `apps/worker/worker/kernels/conv.py` (new)
+### 2. Quantizer: `apps/worker/worker/kernels/conv.py` (new)
 
 ```python
 def quantize_conv2d(module):
@@ -262,7 +262,7 @@ def quantize_conv2d(module):
     return quantize_linear_int8(w, module.bias)
 ```
 
-### 3. Pipeline — `apps/worker/worker/pipeline/quantize.py`
+### 3. Pipeline: `apps/worker/worker/pipeline/quantize.py`
 
 Add a branch:
 
@@ -271,13 +271,13 @@ elif layer.kind == "conv2d" and layer.name in modules:
     quantized[layer.name] = quantize_conv2d(modules[layer.name])
 ```
 
-### 4. Template — `apps/worker/worker/rtl/templates/conv2d.v.j2`
+### 4. Template: `apps/worker/worker/rtl/templates/conv2d.v.j2`
 
 The pattern is similar to `linear_layer.v.j2` but with a sliding-window
 state machine that addresses the input row by row. Reuse the same
 unpack_w + MAC + rescale arithmetic.
 
-### 5. Generator — `apps/worker/worker/rtl/generator.py`
+### 5. Generator: `apps/worker/worker/rtl/generator.py`
 
 ```python
 conv_views = []
@@ -304,7 +304,7 @@ template → reference → test**.
 
 This is the next-largest piece of work and the recipe today is:
 
-### 1. Detection — `apps/worker/worker/pipeline/parse.py`
+### 1. Detection: `apps/worker/worker/pipeline/parse.py`
 
 Walk the module tree looking for a parent module whose immediate
 children include `q_proj`, `k_proj`, `v_proj`, `o_proj` (or `query`,
@@ -312,7 +312,7 @@ children include `q_proj`, `k_proj`, `v_proj`, `o_proj` (or `query`,
 those four into a single `LayerInfo(kind="attention", ...)` and stash
 the four nn.Linear refs in `_modules[name]` as a tuple or named dict.
 
-### 2. Quantizer — `apps/worker/worker/kernels/layers.py`
+### 2. Quantizer: `apps/worker/worker/kernels/layers.py`
 
 The `quantize_attention` function is already defined. Wire it into
 `pipeline/quantize.py`:
@@ -326,14 +326,14 @@ elif layer.kind == "attention" and layer.name in modules:
     )
 ```
 
-### 3. Generator — `apps/worker/worker/rtl/generator.py`
+### 3. Generator: `apps/worker/worker/rtl/generator.py`
 
 Add an `attention_views` list. Render an `attention_block.v.j2`
 template that instantiates four `layer_<sym_q>`, `<sym_k>`, `<sym_v>`,
 `<sym_o>` modules plus the `softmax` submodule plus the `kv_cache`
 submodule, and wires them per the standard attention dataflow.
 
-### 4. Template — `apps/worker/worker/rtl/templates/attention_block.v.j2` (new)
+### 4. Template: `apps/worker/worker/rtl/templates/attention_block.v.j2` (new)
 
 Structural Verilog that wires the existing four `layer_*` modules
 together. The arithmetic is in those modules; this template just
@@ -405,8 +405,8 @@ Add the matching Pydantic schemas in `app/schemas.py`, the router in
 Two files, both manual today (a future codegen step would derive one
 from the other):
 
-1. **`apps/api/app/data/catalog.py`** — append a `CatalogModel(...)`.
-2. **`apps/web/lib/catalog.ts`** — append a matching object to
+1. **`apps/api/app/data/catalog.py`**: append a `CatalogModel(...)`.
+2. **`apps/web/lib/catalog.ts`**: append a matching object to
    `MODEL_CATALOG`.
 
 Both must have the same `id`, `hf_id`, `display_name`, `family`,
@@ -422,7 +422,7 @@ These break things; don't do them.
 
 ```python
 # In apps/worker/...
-from app.models import Project   # NO — that's apps/api
+from app.models import Project   # NO: that's apps/api
 ```
 
 The worker is supposed to run standalone. If it depends on `apps/api`,

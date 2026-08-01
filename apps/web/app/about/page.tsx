@@ -8,17 +8,29 @@ export const metadata = {
   description: "An open compiler from PyTorch to Verilog.",
 };
 
+const FACTS = [
+  {
+    label: "License",
+    body: "MIT. Use, fork, modify, and ship it.",
+  },
+  {
+    label: "Hardware targets",
+    body: "SkyWater 130 · GF22FDX · TSMC 28 / 16 / 7 · Lattice ECP5 · CrossLink-NX · Xilinx Artix-7 · Kria · TinyTapeout · chipIgnite",
+  },
+  {
+    label: "Status",
+    body: "v0.1, pre-1.0. The compiler spine is complete.",
+  },
+];
+
 export default function AboutPage() {
   return (
     <>
       <Nav />
       <main className="mx-auto max-w-[760px] px-6 py-16">
-        <div className="eyebrow mb-3">About</div>
-        <h1 className="font-serif text-[clamp(2.5rem,5.5vw,3.5rem)] tracking-serif leading-[1.05]">
-          About
-        </h1>
+        <h1 className="display text-[clamp(2.5rem,5.5vw,3.5rem)]">About</h1>
 
-        <div className="mt-8 space-y-6 text-[var(--color-text-secondary)] leading-relaxed text-[17px]">
+        <div className="mt-8 space-y-6 text-[var(--color-text-secondary)] leading-[1.65] text-[17px]">
           <p>
             ASICify is an open compiler that turns trained PyTorch models into
             hardware-ready specifications. It produces compressed weights,
@@ -47,66 +59,59 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card
-            label="License"
-            body="MIT licensed, so you can use, fork, modify, and ship it."
-          />
-          <Card
-            label="Hardware targets"
-            body="Eleven targets: SkyWater 130, GF22FDX, TSMC 28 / 16 / 7, Lattice ECP5, CrossLink-NX, Xilinx Artix-7, Kria, TinyTapeout, and chipIgnite."
-          />
-          <Card
-            label="Status"
-            body="Version 0.1, pre-1.0. The compiler spine is complete."
-          />
-        </div>
+        <dl className="mt-12 border-t border-[var(--color-border-default)]">
+          {FACTS.map((f) => (
+            <div
+              key={f.label}
+              className="grid grid-cols-12 gap-4 py-4 border-b border-[var(--color-border-subtle)]"
+            >
+              <dt className="col-span-12 sm:col-span-4 label-mono pt-1">
+                {f.label}
+              </dt>
+              <dd className="col-span-12 sm:col-span-8 m-0 text-[15px] text-[var(--color-text-primary)] leading-[1.6]">
+                {f.body}
+              </dd>
+            </div>
+          ))}
+        </dl>
 
-        <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
-          <h2 className="font-serif text-[1.875rem] tracking-serif mb-4">
-            Get involved
-          </h2>
-          <p className="text-[var(--color-text-secondary)] leading-relaxed mb-6 text-[16px]">
+        <div className="mt-16">
+          <h2 className="display-sub text-[1.75rem] mb-4">Get involved</h2>
+          <p className="text-[var(--color-text-secondary)] leading-[1.65] mb-6 text-[16px]">
             The highest-leverage contributions right now are adding hardware
             targets with cell-library citations, adding new quantization
             formats such as FP4, FP8, and MXFP, adding new layer kinds such
             as Mamba and MoE, and refining cost-model parameters using
             foundry data sheets.
           </p>
-          <ul className="space-y-2 text-sm">
-            <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
-                Source
-              </span>
+          <ul className="space-y-2.5 text-sm m-0 p-0 list-none">
+            <li className="flex gap-3 items-baseline">
+              <span className="label-mono w-20 flex-shrink-0">Source</span>
               <a
                 href="https://github.com/claynicholson/asicify"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
+                className="text-[var(--color-accent-deep)] border-b border-[var(--color-accent)] hover:bg-[var(--color-accent-muted)]"
               >
                 github.com/claynicholson/asicify
               </a>
             </li>
-            <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
-                Issues
-              </span>
+            <li className="flex gap-3 items-baseline">
+              <span className="label-mono w-20 flex-shrink-0">Issues</span>
               <a
                 href="https://github.com/claynicholson/asicify/issues"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
+                className="text-[var(--color-accent-deep)] border-b border-[var(--color-accent)] hover:bg-[var(--color-accent-muted)]"
               >
                 Bug reports and feature requests
               </a>
             </li>
-            <li className="flex gap-3">
-              <span className="text-[var(--color-text-tertiary)] font-mono text-[11px] uppercase tracking-[0.14em] mt-1 w-20 flex-shrink-0">
-                Extend
-              </span>
+            <li className="flex gap-3 items-baseline">
+              <span className="label-mono w-20 flex-shrink-0">Extend</span>
               <Link
                 href="/docs/internals/extending"
-                className="text-[var(--color-accent-deep)] hover:text-[var(--color-accent)] border-b border-[var(--color-accent)]"
+                className="text-[var(--color-accent-deep)] border-b border-[var(--color-accent)] hover:bg-[var(--color-accent-muted)]"
               >
                 Recipes for adding targets, primitives, and stages
               </Link>
@@ -124,10 +129,8 @@ export default function AboutPage() {
         </div>
 
         <div className="mt-16 pt-8 border-t border-[var(--color-border-subtle)]">
-          <h2 className="font-serif text-[1.875rem] tracking-serif mb-4">
-            Acknowledgements
-          </h2>
-          <p className="text-[var(--color-text-secondary)] leading-relaxed text-[15px]">
+          <h2 className="display-sub text-[1.75rem] mb-4">Acknowledgements</h2>
+          <p className="text-[var(--color-text-secondary)] leading-[1.65] text-[15px]">
             Thanks to Tri Dao and the HazyResearch team for Monarch matrices,
             Matt Venn for TinyTapeout, SkyWater and Efabless for the open-PDK
             movement, the Yosys and nextpnr maintainers for the open
@@ -138,16 +141,5 @@ export default function AboutPage() {
       </main>
       <Footer />
     </>
-  );
-}
-
-function Card({ label, body }: { label: string; body: string }) {
-  return (
-    <div className="sticker rounded-[3px] p-4">
-      <div className="eyebrow mb-2">{label}</div>
-      <p className="text-[14px] text-[var(--color-text-secondary)] leading-relaxed">
-        {body}
-      </p>
-    </div>
   );
 }
