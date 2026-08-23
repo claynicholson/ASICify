@@ -9,7 +9,7 @@ file paths, the sequence of edits, the test that proves it works.
 - [Add a sparsity pattern](#add-a-sparsity-pattern)
 - [Add a hardware target](#add-a-hardware-target)
 - [Add a layer kind (Conv2d, Mamba, MoE, etc.)](#add-a-layer-kind)
-- [Add a HuggingFace attention block parser](#add-a-hf-attention-parser)
+- [Extend HF attention detection](#extend-hf-attention-detection)
 - [Add a CLI subcommand](#add-a-cli-subcommand)
 - [Add a database table](#add-a-database-table)
 - [Add a model to the catalog](#add-a-model-to-the-catalog)
@@ -300,50 +300,24 @@ bit-exactness.
 The pattern for any new layer kind: **parser → quantizer → pack →
 template → reference → test**.
 
-## Add a HF attention parser
+## Extend HF attention detection
 
-This is the next-largest piece of work and the recipe today is:
+The parser already groups HF attention blocks: a parent module whose
+immediate children are `q_proj/k_proj/v_proj/o_proj` (LLaMA, Mistral,
+Gemma) or `query/key/value/output.dense` (BERT-style) collapses into a
+single `LayerInfo(kind="attention", ...)`, quantized as a
+`QuantizedAttention` and rendered as one `attention_<sym>.v` module
+(from `attention_block.v.j2`) wiring the four projections plus the
+shared softmax and KV cache.
 
-### 1. Detection: `apps/worker/worker/pipeline/parse.py`
+To support another naming scheme:
 
-Walk the module tree looking for a parent module whose immediate
-children include `q_proj`, `k_proj`, `v_proj`, `o_proj` (or `query`,
-`key`, `value`, `output.dense` in older HF naming). When found, group
-those four into a single `LayerInfo(kind="attention", ...)` and stash
-the four nn.Linear refs in `_modules[name]` as a tuple or named dict.
-
-### 2. Quantizer: `apps/worker/worker/kernels/layers.py`
-
-The `quantize_attention` function is already defined. Wire it into
-`pipeline/quantize.py`:
-
-```python
-elif layer.kind == "attention" and layer.name in modules:
-    refs = modules[layer.name]   # dict with q, k, v, o
-    quantized[layer.name] = quantize_attention(
-        refs["q"].weight, refs["k"].weight, refs["v"].weight, refs["o"].weight,
-        refs["q"].bias, ..., embed_dim=..., num_heads=...,
-    )
-```
-
-### 3. Generator: `apps/worker/worker/rtl/generator.py`
-
-Add an `attention_views` list. Render an `attention_block.v.j2`
-template that instantiates four `layer_<sym_q>`, `<sym_k>`, `<sym_v>`,
-`<sym_o>` modules plus the `softmax` submodule plus the `kv_cache`
-submodule, and wires them per the standard attention dataflow.
-
-### 4. Template: `apps/worker/worker/rtl/templates/attention_block.v.j2` (new)
-
-Structural Verilog that wires the existing four `layer_*` modules
-together. The arithmetic is in those modules; this template just
-manages the streaming dataflow and the KV cache lookup.
-
-### 5. Test
-
-Pick a small HF model (`prajjwal1/bert-tiny`), parse, quantize, render,
-and assert the attention blocks turn into single `attention_block_*.v`
-files instead of four separate `layer_*.v`.
+1. Add the child-name pattern to the detection walk in
+   `apps/worker/worker/pipeline/parse.py`.
+2. Add a test to `tests/test_attention_autodetect.py` with a small
+   module using that naming, asserting its projections collapse into a
+   single `attention_*.v` file instead of four separate `layer_*.v`
+   files.
 
 ## Add a CLI subcommand
 

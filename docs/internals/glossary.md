@@ -80,8 +80,8 @@ Sanity checks beyond raw perplexity.
 ## Transformer architecture
 
 **Attention block**: Q (query), K (key), V (value) projections, scaled
-dot-product, softmax, output projection. The `attention.v.j2` template
-emits this.
+dot-product, softmax, output projection. The `attention_block.v.j2`
+template emits this.
 
 **FFN (feed-forward network)**: Two linear layers with an activation
 between. Usually `up_proj` is 4× the hidden size, `down_proj` brings it
@@ -121,8 +121,7 @@ cost.
 Xilinx Kria is one. Easier to deploy than a bare FPGA.
 
 **Tape-out**: The point where you submit your final design files to the
-foundry to be fabricated. The "Hello World" of ASIC engineering, and the
-moment after which mistakes cost millions.
+foundry to be fabricated. The moment after which mistakes cost millions.
 
 **MPW (Multi-Project Wafer)**: A shared wafer split among many small
 designs to amortize cost. Your design gets a corner of someone else's
@@ -182,9 +181,6 @@ curve.
 area / die area, with edge waste accounted.
 
 **Bare die**: The unpackaged chip. Adding package + test = $2-3.
-
-**Reticle limit**: Max die size for a single exposure (~858 mm² modern).
-Stitch designs cross this with multiple reticles.
 
 ## Multipliers and arithmetic
 

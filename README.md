@@ -57,9 +57,9 @@ INT4 and ternary, swap targets between TSMC 28nm and Lattice ECP5. Watch
 silicon area, cost per chip, and throughput recompute in real time. Every
 number is from a published cost model: no fake gauges, no mock data.
 
-```
-$ pnpm --filter @asicify/web dev
-$ open http://localhost:3001/playground
+```bash
+pnpm --filter @asicify/web dev
+# → http://localhost:3001/playground
 ```
 
 ### 2. Compile to RTL via the CLI (from source)
@@ -69,30 +69,31 @@ There is no PyPI package yet. The CLI runs from a clone:
 ```bash
 git clone https://github.com/claynicholson/asicify
 cd asicify/apps/worker
-uv sync
+uv sync --extra hosted   # `hosted` pulls in transformers for HF models
 uv run asicify compile gpt2 \
     --quantization int4 \
-    --sparsity 2:4 \
+    --sparsity structured_2_4 \
     --target tsmc28,ecp5
 ```
 
 Sample output:
 
 ```
-✓ Parsed model graph         (124M params, 12 layers)
-✓ Quantized to INT4          (perplexity 24.3 to 25.1)
-✓ Applied 2:4 sparsity       (50% zeros)
-✓ Generated RTL              (top.v + 47 modules)
-✓ Estimated tsmc28           (8.2 mm², $4.10 @ 100K)
-✓ Estimated ecp5             (LFE5UM5G-85, 78% LUT util)
+-> Loading model: gpt2
+   Parsed 124,439,808 params
+-> Applying sparsity: structured_2_4
+-> Quantizing to int4
+-> Rendering RTL to ./build
+-> Estimate tsmc28    area=8.2 mm²   cost@100K=$4.10
+-> Estimate ecp5      ...
 
-Output: ./build/gpt2-int4-2_4/
+Done. Output: ./build
 ```
 
-The output is a zip with `top.v`, per-layer modules, hardwired weights,
-Cocotb testbench, bit-exact Python reference, Makefile, and synthesis
-scripts for Yosys, nextpnr, and Vivado. Unzip and `make sim` or
-`make synth-yosys`.
+The output directory contains `top.v`, per-layer modules, hardwired
+weights, a Cocotb testbench, a bit-exact Python reference, a Makefile,
+and synthesis scripts for Yosys, nextpnr, and Vivado. `cd` in and run
+`make sim` or `make synth-yosys`.
 
 ### 3. Run the full local stack
 
@@ -107,7 +108,7 @@ artifact downloads.
 | ------------------------------------------- | ---------------------------- |
 | Live client-side estimator                  | ✓ Real math, real numbers    |
 | Markdown documentation site                 | ✓ Auto-rendered from `/docs` |
-| Landing, playground, blog, about            | ✓ Functional                 |
+| Landing, playground, docs, about            | ✓ Functional                 |
 | FastAPI backend (auth + CRUD + queue + WS)  | ✓ Endpoints wired            |
 | Postgres schema + Alembic migrations        | ✓ Initial migration shipped  |
 | Worker pipeline (parse → quantize → … → validate) | ✓ Real kernels, end to end |
@@ -115,7 +116,7 @@ artifact downloads.
 | Quantization                                | ✓ FP16 / INT8 / INT4 / ternary / binary, bit-exact |
 | Sparsity + decomposition                    | ✓ 2:4, 4:8, block, unstructured · SVD, Monarch, butterfly |
 | Hardware estimator (server-side)            | ✓ Cell library data for 11 targets |
-| RTL generator + 14 Jinja2 templates         | ✓ Top + linear + attention + layernorm + KV cache + testbench + synthesis scripts |
+| RTL generator (16 Jinja2 templates)         | ✓ Top + linear + attention + layernorm + KV cache + testbench + synthesis scripts |
 | Multi-precision multiplier strategies       | ✓ binary / ternary / int4 CSD / int8 Booth / fp16 LUT |
 | WebGPU in-browser inference comparison      | ✓ DistilGPT-2, WASM fallback |
 | PDF report generation                       | ✓ Via `/api/report`          |
@@ -131,7 +132,7 @@ what's shipped, partial, and pending.
 asicify/
 ├── apps/
 │   ├── web/             Next.js 15 frontend
-│   │                    Landing · live playground · markdown docs · blog · about
+│   │                    Landing · live playground · markdown docs · about
 │   │
 │   ├── api/             FastAPI backend
 │   │                    Clerk JWT auth · project CRUD · Redis job queue · WebSocket progress
@@ -305,13 +306,9 @@ generator are on GitHub. No NDAs, no per-tape-out licensing. The hosted
 product is convenience and compute.
 
 **Hardware-software co-design.** Sub-1-bit effective representation via
-ternary + sparsity + decomposition. Monarch matrix factorization built
-into synthesis. Hardware-aware fine-tuning that targets your specific
-deployment.
-
-**Inverse design.** Specify a target chip area or BOM cost; ASICify
-searches the model architecture space for the best model that fits.
-Hardware-aware NAS with real cost models.
+ternary + sparsity + decomposition. Monarch and butterfly matrix
+factorization built into the pipeline, with the structured zeros carried
+all the way into synthesis.
 
 **Design space exploration.** Pull a slider in the playground, watch the
 chip change. Cached estimates update in under a millisecond.
@@ -339,11 +336,10 @@ chip change. Cached estimates update in under a millisecond.
 
 ## Status
 
-Pre-1.0. Spine first: model in → compressed model out → quality validation
-→ RTL out → cost estimate → playground.
-
-We're shipping every week. Watch [docs/roadmap.md](./docs/roadmap.md) for
-the phase plan and [CHANGELOG.md](./CHANGELOG.md) for what landed.
+Pre-1.0. The compiler spine — model in → compressed model → quality
+validation → RTL → cost estimate — works end to end and is verified in CI
+on every push. See [docs/roadmap.md](./docs/roadmap.md) for the phase plan
+and [CHANGELOG.md](./CHANGELOG.md) for what landed.
 
 ## Contributing
 

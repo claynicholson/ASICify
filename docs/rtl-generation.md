@@ -19,21 +19,24 @@ default. Larger models need tile-based reuse; see the roadmap.
 One Jinja2 template per primitive, in
 [`apps/worker/worker/rtl/templates/`](../apps/worker/worker/rtl/templates):
 
-| Template            | Generates                              |
-| ------------------- | -------------------------------------- |
-| `top.v.j2`          | Top wrapper; wires layers in pipeline  |
-| `linear_layer.v.j2` | Fixed-coefficient matrix-vector MAC    |
-| `attention.v.j2`    | Q/K/V proj + scaled dot-product + softmax + O proj |
-| `layernorm.v.j2`    | Mean/variance + normalize+scale+shift  |
-| `embedding.v.j2`    | Mask-ROM lookup table                  |
-| `kv_cache.v.j2`     | Addressable BRAM read/write port       |
-| `weights.vh.j2`     | Hardwired weight constants             |
-| `tb_top.py.j2`      | Cocotb testbench                       |
-| `reference.py.j2`   | Bit-exact Python reference             |
-| `Makefile.j2`       | sim / synth-yosys / synth-vivado       |
-| `yosys.tcl.j2`      | Yosys synthesis script                 |
-| `nextpnr.sh.j2`     | nextpnr place-and-route (ECP5)         |
-| `vivado.tcl.j2`     | Vivado script (Xilinx)                 |
+| Template                | Generates                              |
+| ----------------------- | -------------------------------------- |
+| `top.v.j2`              | Top wrapper; wires layers in pipeline  |
+| `linear_layer.v.j2`     | Fixed-coefficient matrix-vector MAC    |
+| `fp16_layer.v.j2`       | FP16 linear layer (behavioral float multiply) |
+| `attention_block.v.j2`  | Q/K/V/O projections + softmax + KV cache, wired structurally |
+| `layernorm.v.j2`        | Mean/variance + normalize+scale+shift  |
+| `embedding.v.j2`        | Mask-ROM lookup table                  |
+| `softmax.v.j2`          | LUT-based integer softmax              |
+| `kv_cache.v.j2`         | Addressable BRAM read/write port       |
+| `weights.vh.j2`         | Hardwired weight constants             |
+| `tb_top.py.j2`          | Cocotb testbench                       |
+| `reference.py.j2`       | Bit-exact Python reference             |
+| `Makefile.j2`           | sim / synth-yosys / synth-vivado       |
+| `yosys.tcl.j2`          | Yosys synthesis script                 |
+| `nextpnr.sh.j2`         | nextpnr place-and-route (ECP5)         |
+| `vivado.tcl.j2`         | Vivado script (Xilinx)                 |
+| `README.md.j2`          | Package README                         |
 
 ## Multiplier strategies
 
@@ -57,7 +60,7 @@ output to the Python reference. For deterministic operations the comparison
 is bit-exact; for parallel reductions a small tolerance applies.
 
 The reference Python (`reference.py`) loads the same weight tensors that were
-packed into `weights/weights.vh` and applies them with the same fixed-point
+packed into `weights.vh` and applies them with the same fixed-point
 arithmetic the multiplier strategy uses. This means CI can run the testbench
 on push and fail the build on any drift between RTL and reference.
 

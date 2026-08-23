@@ -79,7 +79,7 @@ Defined in three places that must stay in sync:
 - TypeScript: `packages/shared/src/types.ts` (no `ModelGraph` per se on the
   client, but related types live here)
 - Pydantic: `apps/api/app/schemas.py`
-- Python dataclass: `apps/worker/worker/types.py:30` (`ModelGraph`)
+- Python dataclass: `apps/worker/worker/types.py` (`ModelGraph`)
 
 `ModelGraph` is what you get out of stage 1 (parse) and what every other
 pipeline stage takes and returns. It carries layers (`LayerInfo`), per-layer
@@ -118,8 +118,8 @@ but the duplication is deliberate. The client is read-only and stateless;
 shipping the worker code to the browser would be wrong on every axis. When
 you change cell library numbers, you change them in both:
 
-- TS: `apps/web/lib/estimator.ts:25` (`NODE_PARAMS`)
-- Python: `apps/worker/worker/estimator/targets.py:23` (`ASIC_NODES`)
+- TS: `apps/web/lib/estimator.ts` (`NODE_PARAMS`)
+- Python: `apps/worker/worker/estimator/targets.py` (`ASIC_NODES`)
 
 A future improvement would be a build-step codegen that derives one from the
 other. For now, conventions enforce the sync.

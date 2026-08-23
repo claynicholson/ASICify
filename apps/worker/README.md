@@ -22,7 +22,11 @@ The worker blocks on `BLPOP asicify:jobs` and dispatches by `job_type`:
 ```
 worker/
 ├── main.py              Entry point — Redis poller + dispatcher
+├── cli.py               asicify compile / demo / estimate
+├── modal_app.py         Modal deployment definition
 ├── types.py             ModelGraph IR, CompressionConfig
+├── kernels/             Pure tensor work: quantize, pack, sparsity,
+│                        decompose, layers, attention
 ├── pipeline/            Compression stages
 │   ├── parse.py
 │   ├── quantize.py
@@ -30,8 +34,9 @@ worker/
 │   ├── decompose.py
 │   ├── validate.py
 │   └── orchestrator.py
+├── loaders/             HuggingFace model loader (`hosted` extra)
 ├── rtl/
-│   ├── generator.py     Jinja2 → zip
+│   ├── generator.py     Jinja2 → Verilog package
 │   └── templates/       *.v.j2, tb_top.py.j2, Makefile.j2, …
 └── estimator/
     ├── area.py
@@ -44,5 +49,5 @@ worker/
 ## Modal deployment
 
 In production the worker runs on [Modal](https://modal.com). See
-`worker/main.py` for the Modal app definition. One job = one container =
+`worker/modal_app.py` for the app definition. One job = one container =
 scales to zero when idle.

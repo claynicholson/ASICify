@@ -23,9 +23,10 @@ apps/worker/
 │   ├── types.py           ModelGraph, LayerInfo, CompressionConfig dataclasses
 │   ├── kernels/           Tensor work: pure functions, no I/O
 │   │   ├── __init__.py
-│   │   ├── quantize.py    INT8 / INT4 / ternary / binary + bit-exact forward
+│   │   ├── quantize.py    INT8 / INT4 / ternary / binary / FP16 + bit-exact forward
 │   │   ├── pack.py        Tensor -> SystemVerilog literal strings
 │   │   ├── sparsity.py    2:4, 4:8, block-16, unstructured pruning
+│   │   ├── decompose.py   Low-rank SVD + Monarch/butterfly projection
 │   │   ├── layers.py      LayerNorm, Embedding, QuantizedAttention dataclasses
 │   │   └── attention.py   Integer softmax + reference attention
 │   ├── pipeline/          Orchestration: calls kernels in order
@@ -40,7 +41,7 @@ apps/worker/
 │   │   └── huggingface.py transformers loader (in `hosted` extra)
 │   ├── rtl/               Verilog generation
 │   │   ├── generator.py   Jinja2 -> zip
-│   │   └── templates/     14 .j2 files (see rtl-templates.md)
+│   │   └── templates/     *.j2 files (see rtl-templates.md)
 │   └── estimator/         Hardware estimation
 │       ├── area.py
 │       ├── throughput.py

@@ -22,7 +22,7 @@ apps/worker/worker/kernels/
 
 Everything in this package is **pure**. No I/O, no global state, no Redis,
 no environment variable reads. Every function is a pure tensor → tensor
-mapping. This is what lets pytest run all 80 tests in 4.6 seconds.
+mapping. This is what lets pytest run the whole suite in about five seconds.
 
 ## The bit-exactness contract
 
@@ -295,14 +295,15 @@ class QuantizedAttention:
 ```
 
 This is a structural composite. The four projections are independent
-QuantizedLinear records that render as four `layer_<sym>.v` files. The
-softmax LUT is a global constant emitted once into `weights.vh`.
+QuantizedLinear records; the softmax LUT is a global constant emitted
+once into `weights.vh`.
 
-The current parser (in `worker/pipeline/parse.py`) does **not**
-auto-detect HF attention blocks and group them into a
-`QuantizedAttention`. That is the next-largest piece of work. For now
-the projections render as separate Linear layers, which is correct but
-loses the structural relationship.
+The parser (`worker/pipeline/parse.py`) auto-detects HF attention
+blocks: modules whose children are `q_proj/k_proj/v_proj/o_proj`
+(LLaMA, Mistral, Gemma) or `query/key/value/output.dense` (BERT-style)
+collapse into a single attention layer, which renders as one
+`attention_<sym>.v` module wiring the four projections plus the shared
+softmax and KV cache. See `tests/test_attention_autodetect.py`.
 
 ## `attention.py`: softmax and reference attention
 
@@ -334,8 +335,8 @@ implemented as a right shift by `ceil(log2(head_dim) / 2)`, which
 approximates dividing by `sqrt(head_dim)` and is exactly what the RTL
 does (right-shifts are free in hardware; real division isn't).
 
-Used in `tests/test_attention.py` to verify the building blocks before
-the full structural attention block is wired in the parser.
+Used in `tests/test_attention.py` to verify the building blocks
+independently of the full structural attention block.
 
 ## How the pipeline calls the kernels
 
@@ -349,6 +350,10 @@ worker.cli.cmd_demo
   ├── apply_sparsity(graph, config)                   [pipeline/sparsity.py]
   │     calls kernels.sparsity.apply_sparsity per linear layer
   │     replaces _weights with pruned floats
+  │
+  ├── apply_decomposition(graph, config)              [pipeline/decompose.py]
+  │     calls kernels.decompose (SVD / Monarch / butterfly)
+  │     replaces each factored layer with <name>.b / <name>.a Linears
   │
   ├── quantize_graph(graph, config)                   [pipeline/quantize.py]
   │     for linear:    kernels.quantize.quantize_linear  -> QuantizedLinear
@@ -381,14 +386,18 @@ in that case the worker re-runs `parse_module` from a model id).
 | Test file | What it covers |
 |-----------|----------------|
 | `tests/test_quantize.py`        | INT8 quantizer + forward |
-| `tests/test_pack.py`            | All four packing formats |
-| `tests/test_quantize_multi.py`  | Bit-exactness across all four precisions × generated reference.py |
+| `tests/test_pack.py`            | All packing formats |
+| `tests/test_quantize_multi.py`  | Bit-exactness across the integer precisions × generated reference.py |
+| `tests/test_fp16.py`            | FP16 kernel + dispatch + reference bit-exactness |
 | `tests/test_sparsity.py`        | All four sparsity patterns + pipeline integration + binary skip |
+| `tests/test_decompose.py`       | Low-rank SVD + Monarch/butterfly + pipeline integration |
 | `tests/test_layers.py`          | LayerNorm, Embedding kernels + render to package |
 | `tests/test_attention.py`       | Softmax LUT, softmax_int, attention_int_forward, Q/K/V/O renders |
+| `tests/test_attention_autodetect.py` | HF attention parsing + structural attention rendering |
 | `tests/test_validate.py`        | Activation-MSE, ordering across precisions, top1, fallback |
 | `tests/test_loader.py`          | parse_model dispatch (module/checkpoint/HF stub), error messages |
 | `tests/test_end_to_end.py`      | Full TinyMLP → RTL → reference 32-trial bit-exactness |
+| `tests/test_simulation.py`      | Generated package's `make sim` (Verilator + cocotb; skips without tools) |
 
 Run the suite:
 
@@ -397,4 +406,5 @@ cd apps/worker
 python -m uv run pytest tests/ -v
 ```
 
-80 tests, ~5 seconds on CPU.
+90 tests, ~5 seconds on CPU (the simulation test skips locally without
+Verilator).

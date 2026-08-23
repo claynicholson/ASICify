@@ -20,6 +20,7 @@ build/<name>/
 ├── weights.vh            ALL hardwired constants (W, scales, biases, gamma, beta, embeddings, softmax LUT)
 ├── modules/
 │   ├── layer_<sym>.v     one file per linear / layernorm / embedding layer
+│   ├── attention_<sym>.v one file per detected attention block
 │   └── ...
 ├── softmax.v             shared softmax submodule (used by attention blocks)
 ├── kv_cache.v            shared KV cache submodule (used by attention blocks)
@@ -108,6 +109,24 @@ while streaming.
 **Adding a new precision** = adding a new `{% elif %}` arm to
 `unpack_w` plus a new pack format and a new `_multiplier_strategy`
 mapping.
+
+### `fp16_layer.v.j2`: the float path
+
+**Generates**: `modules/layer_<symbol>.v` for linear layers quantized
+to FP16. FP16 doesn't fit the integer MAC + rescale shape, so it gets
+its own template: a behavioral float multiplier using
+`$bitstoshortreal`, suitable for simulation and FPGA synthesis.
+
+### `attention_block.v.j2`: structural attention
+
+**Generates**: `modules/attention_<symbol>.v` for each detected
+attention block. Structural Verilog that instantiates the four
+projection modules (Q/K/V/O), the shared `softmax` submodule, and the
+`kv_cache` submodule, and wires them per the standard attention
+dataflow. The arithmetic lives in the instantiated modules; this
+template only manages the streaming dataflow. Today it wires
+single-token attention; multi-token KV-cache rotation is the next
+template iteration (see the roadmap).
 
 ### `weights.vh.j2`: the constant database
 

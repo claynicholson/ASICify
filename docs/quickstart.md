@@ -26,26 +26,20 @@ it directly from a clone.
 ```bash
 git clone https://github.com/claynicholson/asicify
 cd asicify/apps/worker
-uv sync
+uv sync --extra hosted
 uv run asicify compile gpt2 \
     --quantization int4 \
-    --sparsity 2:4 \
+    --sparsity structured_2_4 \
     --target tsmc28,ecp5 \
     --output ./build
 ```
 
-This produces:
-
-```
-./build/gpt2.zip
-```
-
-Containing the RTL package (`top.v`, per-layer modules, weights,
-testbench, synthesis scripts). Unzip and run:
+This renders the RTL package (`top.v`, per-layer modules, `weights.vh`,
+testbench, bit-exact Python reference, synthesis scripts) into `./build`
+and prints an area/cost estimate per target. Then:
 
 ```bash
-unzip -d gpt2 ./build/gpt2.zip
-cd gpt2
+cd build
 make sim          # cocotb + Verilator simulation
 make synth-yosys  # ECP5 synthesis (requires yosys + nextpnr)
 ```

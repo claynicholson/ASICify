@@ -10,23 +10,22 @@ apps/web/
 │   ├── layout.tsx           Root <html>, font preload, metadata
 │   ├── page.tsx             Landing
 │   ├── globals.css          Tailwind v4 @theme tokens
-│   ├── playground/page.tsx  The demo
-│   ├── projects/page.tsx    Dashboard
-│   ├── projects/[id]/page.tsx  Project detail
-│   ├── docs/page.tsx        Docs index
-│   ├── pricing/page.tsx     Pricing tiers
-│   └── sign-in/page.tsx     Clerk sign-in stub
+│   ├── playground/page.tsx  The live demo
+│   ├── docs/                Markdown docs site ([...slug] renders /docs/*)
+│   ├── about/page.tsx       About
+│   └── api/report/          PDF report generation route
 ├── components/
 │   ├── nav.tsx, footer.tsx          Shell
 │   ├── ui/                          Primitives (button, card, metric)
 │   ├── landing/                     Landing-page sections
-│   └── playground/                  Three-column playground widgets
+│   └── playground/                  Playground widgets
 ├── lib/
-│   ├── api.ts               Fetch wrappers + WebSocket helper
 │   ├── catalog.ts           Curated model list (mirrors api/data/catalog.py)
 │   ├── estimator.ts         Client-side hardware estimator
+│   ├── docs.ts              Markdown loading for the /docs routes
+│   ├── report.tsx           @react-pdf/renderer document for /api/report
 │   └── utils.ts             cn(), formatCompact, formatUSD, formatArea
-├── next.config.ts           Rewrites /api/backend/* → backend
+├── next.config.ts           Standalone output for the Docker image
 ├── postcss.config.mjs       Tailwind v4 PostCSS plugin
 └── tsconfig.json            Path aliases @/, @asicify/shared
 ```
@@ -34,12 +33,15 @@ apps/web/
 ## Routing
 
 App Router conventions. Every page is a server component by default; client
-components opt in via the `"use client"` directive. The two important client
-pages are:
+components opt in via the `"use client"` directive. The two pages that
+matter most:
 
 - `app/playground/page.tsx`: entirely client-side, drives the live estimator.
-- `app/projects/[id]/page.tsx`: server-rendered shell, with a client island
-  inside the future Verification tab.
+- `app/docs/[...slug]/page.tsx`: server component that reads markdown from
+  the repo's `docs/` directory at request time via `lib/docs.ts`.
+
+There is no hosted dashboard (projects, sign-in) in the tree yet; those
+pages arrive with the public API deployment.
 
 Path aliases:
 
@@ -50,35 +52,31 @@ Path aliases:
 ## Styling
 
 Tailwind v4 with `@theme` design tokens defined in
-[`app/globals.css`](../../apps/web/app/globals.css). The token names map 1:1
-to the brand system in the spec:
+[`app/globals.css`](../../apps/web/app/globals.css). The design system is
+the "engineering datasheet" look documented in [DESIGN.md](../../DESIGN.md):
+porcelain near-white paper, warm ink, one copper accent, hairline rules.
 
 ```css
 @theme {
-  --color-bg-base: #0A0B0E;
-  --color-bg-elevated: #14161B;
-  --color-bg-overlay: #1C1F26;
-  --color-border-subtle: #232730;
-  --color-border-default: #2D323C;
-  --color-text-primary: #F4F5F7;
-  --color-text-secondary: #A0A6B1;
-  --color-text-tertiary: #6B7280;
-  --color-accent: #5B8FF9;
+  --color-bg-base: oklch(0.972 0.0045 78);   /* porcelain */
+  --color-bg-ink: oklch(0.215 0.012 55);     /* warm near-black bands */
+  --color-text-primary: oklch(0.22 0.014 55);
+  --color-accent: oklch(0.60 0.18 40);       /* fab copper */
   /* … */
 }
 ```
 
 Components reference these via `var(--color-…)` rather than Tailwind
-shorthand for two reasons: (1) the brand system tokens don't map cleanly to
-the default Tailwind palette, and (2) it makes the dark theme single-source.
+shorthand: the brand tokens don't map cleanly to the default Tailwind
+palette, and it keeps the palette single-source.
 
-**Conventions:**
+**Conventions** (full version in [DESIGN.md](../../DESIGN.md)):
 
-- Sharp corners with `rounded-[6px]`, never the default Tailwind radii.
-- Hover = brightness shift, never color shift.
-- Animations: 150–200ms `ease-out`. Anything slower feels sluggish in
-  developer tools.
-- No emoji, no celebratory confetti, no bouncy springs. Technical software.
+- Hairline borders everywhere; small radii (2px on buttons), never the
+  default Tailwind radii.
+- Copper appears on hover/focus and in figures, never as wallpaper.
+- Essentially no motion: hover/focus transitions 120–150ms `ease-out` only.
+- No emoji, no gradients as decoration. Technical software.
 
 ## The component anatomy
 
@@ -91,9 +89,9 @@ Three primitives, all built on Radix where useful:
   Slot so you can wrap a `<Link>` and keep the styles.
 - **`card.tsx`**: `Card`, `CardHeader`, `CardTitle`, `CardDescription`,
   `CardContent`. Pure layout, no behavior.
-- **`metric.tsx`**: The big numeric display used throughout the playground
-  and project detail. Mono font for the value, uppercase tracked label,
-  optional delta with semantic color.
+- **`metric.tsx`**: The big numeric display used throughout the playground.
+  Mono font for the value, uppercase tracked label, optional delta with
+  semantic color.
 
 These primitives are the only place where raw Tailwind utility classes
 intermix with `var(--color-*)`. Higher-level components consume the
@@ -104,17 +102,17 @@ primitives instead of restyling from scratch.
 Five sections, each a self-contained component invoked from
 [`app/page.tsx`](../../apps/web/app/page.tsx) in order:
 
-1. `hero.tsx`: H1 + two CTAs + four stats. Background grid via
-   `.bg-grid` class in `globals.css`.
-2. `how-it-works.tsx`: 3-step horizontal flow with Lucide icons. Uses a
-   subtle 1px grid effect (border-collapse trick: `gap-px` over a tinted
-   background).
-3. `differentiators.tsx`: 3-card grid of pillar value props.
-4. `use-cases.tsx`: Persona tabs. Client component that switches the
-   visible panel without route changes.
-5. `code-snippet.tsx`: Two-column layout with a fake terminal showing the
-   CLI output. The "terminal chrome" (three dots + label) is a decorative
-   div, not a real terminal embed.
+1. `hero.tsx`: headline + CTAs, with the die-floorplan figure
+   (`die-floorplan.tsx`) as the hero artifact.
+2. `how-it-works.tsx`: the model-to-silicon flow.
+3. `differentiators.tsx`: pillar value props as ruled definition lists.
+4. `vs-closed-silicon.tsx`: comparison table against the closed-EDA
+   status quo (dark ink band).
+5. `code-snippet.tsx`: terminal transcript of the CLI output (dark ink
+   band, no fake traffic-light dots).
+
+Shared: `section-header.tsx` renders the hairline rule + mono section
+index (`01`, `02`, …) that opens every section.
 
 When you add a section, follow this pattern: server component if static,
 client only when state is needed. Each section file owns its data; landing
@@ -134,9 +132,11 @@ Three columns:
   treemap and cost-vs-throughput Pareto scatter. Floorplan colors map to
   area-breakdown components; Pareto plot uses Recharts.
 
-Plus `inference-comparison.tsx` for the side-by-side text generation preview.
-This is a **stub** that picks from canned outputs by quantization level; the
-real version uses transformers.js + WebGPU and is on the roadmap.
+Plus two inference previews: `inference-comparison.tsx` is a canned
+side-by-side text sample keyed by quantization level, and
+`webgpu-inference.tsx` runs real in-browser inference via
+`@huggingface/transformers` (WebGPU with WASM fallback, DistilGPT-2 by
+default, ~80MB cached after first load).
 
 The state for the whole playground lives in
 [`app/playground/page.tsx`](../../apps/web/app/playground/page.tsx) using
@@ -161,8 +161,8 @@ Why duplicate it? Three reasons:
    one is wrong.
 
 **When you change cell library numbers**, change them in both:
-- `apps/web/lib/estimator.ts:25` (`NODE_PARAMS`)
-- `apps/worker/worker/estimator/targets.py:23` (`ASIC_NODES`)
+- `apps/web/lib/estimator.ts` (`NODE_PARAMS`)
+- `apps/worker/worker/estimator/targets.py` (`ASIC_NODES`)
 
 The math involves four functions of interest:
 
@@ -178,15 +178,12 @@ their tweaks to be reflected, even if rough.
 
 ## API client
 
-`lib/api.ts` will be a small `fetch` wrapper with an auth bearer header and
-a `subscribeProgress(projectId, onEvent)` helper that opens a WebSocket and
-dispatches typed `ProgressEvent` messages. It is not yet present in the
-tree; the playground talks to its own in-browser estimator until the hosted
-API ships.
-
-`request<T>(path, init)` is intentionally minimal: no React Query / SWR. The
-hosted dashboard does need cache invalidation later; when that happens, wrap
-this with TanStack Query rather than replacing.
+There is no `lib/api.ts` yet; the playground talks to its own in-browser
+estimator until the hosted API ships. When it does, the plan is a small
+`fetch` wrapper with an auth bearer header plus a
+`subscribeProgress(projectId, onEvent)` WebSocket helper — deliberately
+minimal, wrapped with TanStack Query later if the dashboard needs cache
+invalidation.
 
 ## Catalog
 
@@ -218,15 +215,13 @@ premature.
 
 ## Auth integration
 
-The repo currently ships a sign-in **stub** at `app/sign-in/page.tsx`. The
-real integration plan:
+There is no sign-in UI in the tree yet. The integration plan, when the
+hosted dashboard lands:
 
 1. Wrap `app/layout.tsx`'s `<body>` children in `<ClerkProvider>`.
-2. Replace the stub with `<SignIn />` from `@clerk/nextjs`.
-3. Add a `middleware.ts` at `apps/web/middleware.ts` to protect `/projects`
-   and `/projects/[id]`.
-4. Forward the Clerk JWT in `lib/api.ts:request` via the existing `token`
-   parameter.
+2. Add a sign-in page using `<SignIn />` from `@clerk/nextjs`.
+3. Add `apps/web/middleware.ts` to protect the `/projects` routes.
+4. Forward the Clerk JWT in the (future) `lib/api.ts` request wrapper.
 
 `@clerk/nextjs` is already in `package.json:dependencies`. We didn't wire it
 because development without a Clerk account would hit a wall; the API has a

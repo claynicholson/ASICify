@@ -9,7 +9,7 @@ of truth.
 The compiler core works end-to-end across four quantization precisions. The
 bit-exactness contract (`kernel forward == generated reference.py == RTL`)
 is locked in by 90 pytest tests in
-[`apps/worker/tests/`](../apps/worker/tests/): the fast ones run in ~7
+[`apps/worker/tests/`](../apps/worker/tests/): the fast ones run in ~5
 seconds on CPU; the cocotb/Verilator simulation test runs in CI on every
 push.
 
@@ -93,7 +93,7 @@ push.
 
 ### Web
 
-- [x] Next.js landing, playground, markdown docs site, blog stub, about
+- [x] Next.js landing, playground, markdown docs site, about
 - [x] Live in-browser hardware estimator (sub-millisecond per slider move)
 - [x] PDF report generation via `@react-pdf/renderer` at `/api/report`
 - [x] WebGPU in-browser inference preview using `@huggingface/transformers`

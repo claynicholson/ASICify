@@ -115,7 +115,7 @@ so the API will reject malformed payloads. That's a feature.
 - All function signatures fully annotated. `def foo(x: int) -> str: …`.
 - `from __future__ import annotations` at the top of every module so we
   can use modern syntax (`list[X]`, `X | None`) on Python 3.10+.
-- `mapped_column[T]` for SQLAlchemy ORM columns.
+- `Mapped[T]` + `mapped_column(...)` for SQLAlchemy ORM columns.
 - Pydantic for any data that crosses a process boundary; dataclasses for
   internal IR.
 - Use `Literal[...]` for closed string sets, not `str`. Compilers help.
@@ -285,7 +285,8 @@ Never edit a migration that's already been deployed. Make a new one.
 
 ## Verilog conventions
 
-- `\`default_nettype none` at the top of every file. `wire` at the bottom.
+- `` `default_nettype none `` at the top of every file,
+  `` `default_nettype wire `` at the bottom.
 - Active-low reset everywhere: `rst_n`. Synchronous deassertion.
 - Standard handshake: `valid` / `ready` pair, `data` payload. Apply this
   uniformly across modules.

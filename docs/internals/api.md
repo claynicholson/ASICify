@@ -66,7 +66,7 @@ Mode 3 is dangerous in production; the deploy checklist must verify that
 
 User reconciliation: every authenticated route that needs a user calls
 `_ensure_user(session, current)`; see
-[`routers/projects.py:26`](../../apps/api/app/routers/projects.py). This
+[`routers/projects.py`](../../apps/api/app/routers/projects.py). This
 upserts the User row by `clerk_id`, so the first call after Clerk sign-up
 silently creates the row.
 
@@ -249,14 +249,6 @@ The first tests to write: project CRUD with auth happy path, then the
 
 ## Deploying
 
-The MVP target is **Fly.io**. The Dockerfile is not yet committed; when you
-add it:
-
-1. Multi-stage: builder runs `uv sync --no-dev`, runtime copies only the
-   resolved venv + `app/`.
-2. `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]`.
-3. Health check on `GET /health`.
-4. Sec: don't bake `.env` into the image; Fly secrets handle that.
-
-Long-term, the API gets a Modal deployment too. The factory pattern means
-that's a new entrypoint, not a refactor.
+The target is **Fly.io**. `apps/api/Dockerfile` and `apps/api/fly.toml`
+are committed; see [deployment.md](deployment.md) for the full runbook
+(secrets, migrations, scaling, health checks).

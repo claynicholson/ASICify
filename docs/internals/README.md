@@ -22,8 +22,8 @@ want [docs/quickstart.md](../quickstart.md) and
 4. [data-flow.md](data-flow.md): end-to-end traces of three real
    user actions, file by file.
 5. [extending.md](extending.md): recipes to add a precision, a sparsity
-   pattern, a target, a layer kind, a HF parser, a CLI subcommand, a DB
-   table, a catalog entry.
+   pattern, a target, a layer kind, an HF attention naming scheme, a CLI
+   subcommand, a DB table, a catalog entry.
 6. [deployment.md](deployment.md): production deploy runbook for web,
    API, worker, plus CI.
 7. [conventions.md](conventions.md): code style, naming, structure.

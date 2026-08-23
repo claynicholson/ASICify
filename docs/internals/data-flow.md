@@ -48,16 +48,18 @@ client-side estimator exists.
 
 ## Trace 2: Authenticated user creates and compiles a project
 
-Longer trace. Hits all four layers.
+Longer trace. Hits all four layers. The dashboard UI (`lib/api.ts`, the
+projects pages) is not in the tree yet, so the frontend steps below are
+marked *(planned)*; everything from the API inward is implemented.
 
 ### Phase A: Project creation
 
 ```
-1. User clicks "Save as project" in the playground.
-   File: apps/web/app/playground/page.tsx (button handler, to be wired)
-   Future code: api.createProject({name, model_source, compression, targets}, token)
+1. User clicks "Save as project" in the playground. (planned)
+   File: apps/web/app/playground/page.tsx
+   Code: api.createProject({name, model_source, compression, targets}, token)
 
-2. Fetch wrapper sends the request.
+2. Fetch wrapper sends the request. (planned)
    File: apps/web/lib/api.ts
    Code: request<Project>("/api/projects", {method: "POST", body, token})
    Headers: Authorization: Bearer <Clerk JWT>
@@ -90,9 +92,9 @@ Longer trace. Hits all four layers.
 ### Phase B: Job submission
 
 ```
-1. User clicks "Compile to RTL" on the project detail page.
+1. User clicks "Compile to RTL" on the project detail page. (planned)
    File: apps/web/app/projects/[id]/page.tsx
-   Future code: api.startCompress(id, token)
+   Code: api.startCompress(id, token)
 
 2. POST /api/projects/{id}/compress hits the API.
    File: apps/api/app/routers/projects.py
@@ -138,7 +140,7 @@ Longer trace. Hits all four layers.
 
    a. parse_model({id, type})
       File: apps/worker/worker/pipeline/parse.py
-      Returns: ModelGraph (currently synthesized; real torch.fx is roadmap)
+      Returns: ModelGraph (real module walk + HF attention detection)
 
    b. quantize_graph(graph, config)
       File: apps/worker/worker/pipeline/quantize.py
@@ -167,7 +169,7 @@ Longer trace. Hits all four layers.
 ### Phase D: Progress streaming back to the user
 
 ```
-1. Frontend opened the WebSocket on page load.
+1. Frontend opened the WebSocket on page load. (planned)
    File: apps/web/lib/api.ts
    Function: subscribeProgress(projectId, onEvent)
    URL: ws://api/api/projects/{id}/progress
@@ -224,22 +226,24 @@ into the codegen specifically.
       Wires inputs → layer_0 → layer_1 → … → outputs.
       Each layer instance is named u_<index>.
 
-   b. weights.vh.j2 → weights/weights.vh
-      One localparam per linear layer, plus embedding tables.
+   b. weights.vh.j2 → weights.vh
+      One localparam per linear layer, plus embedding tables and the
+      softmax LUT.
 
-   c. For each layer with kind in (linear, ffn, attention, layernorm, embedding):
-      - linear_layer.v.j2 / attention.v.j2 / layernorm.v.j2 / embedding.v.j2
-        → modules/<name>.v
+   c. For each layer with kind in (linear, attention, layernorm, embedding):
+      - linear_layer.v.j2 (or fp16_layer.v.j2) / attention_block.v.j2 /
+        layernorm.v.j2 / embedding.v.j2
+        → modules/layer_<sym>.v (attention_<sym>.v for attention)
       - Includes weights.vh
 
-   d. kv_cache.v.j2 → kv_cache.v
-      Standalone BRAM module.
+   d. softmax.v.j2 → softmax.v, kv_cache.v.j2 → kv_cache.v
+      Shared submodules, always emitted.
 
    e. tb_top.py.j2 → tb_top.py
       Cocotb testbench that imports reference.py.
 
    f. reference.py.j2 → reference.py
-      Bit-exact Python implementation (currently a stub).
+      Bit-exact NumPy reference implementation.
 
    g. Makefile.j2 → Makefile
       sim / synth-yosys / synth-vivado targets.
@@ -276,14 +280,14 @@ The output zip structure:
 <model>.zip
 ├── README.md
 ├── top.v
+├── weights.vh
+├── softmax.v
 ├── kv_cache.v
-├── weights/weights.vh
 ├── modules/
-│   ├── embed.v
-│   ├── block_0.attn.v
-│   ├── block_0.ffn.v
-│   ├── block_0.ln.v
-│   ├── block_1.attn.v
+│   ├── layer_embed.v
+│   ├── attention_block_0_attn.v
+│   ├── layer_block_0_ffn.v
+│   ├── layer_block_0_ln.v
 │   └── …
 ├── tb_top.py
 ├── reference.py
